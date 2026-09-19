@@ -27,6 +27,11 @@ concurrency:
   group: publish
   cancel-in-progress: false
 
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  NuGetPackageSourceCredentials_github: Username=${{ github.actor }};Password=${{ secrets.GITHUB_TOKEN }};ValidAuthenticationTypes=Basic
+
 jobs:
   version:
     name: Resolve preview version
