@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="Debug-VM" />
+    <BuildType Name="Release-VM" />
+  </Configurations>
+  <Project Path="Broiler.JSeal/Broiler.JSeal.csproj" />
+  <Project Path="Broiler.JSeal.BroilerJs/Broiler.JSeal.BroilerJs.csproj" />
+  <Project Path="Broiler.JSeal.Vm/Broiler.JSeal.Vm.csproj" />
+  <Project Path="Broiler.JSeal.Tests/Broiler.JSeal.Tests.csproj" />
+</Solution>

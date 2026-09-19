@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.JSeal.Tests</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.JSeal\Broiler.JSeal.csproj" />
+    <ProjectReference Include="..\Broiler.JSeal.BroilerJs\Broiler.JSeal.BroilerJs.csproj" />
+  </ItemGroup>
+
+  <!--
+    THE VM SIDE IS CONDITIONAL, AND THE CONDITION IS THE POINT.
+
+    The conformance suite itself names no engine type — that is what makes it a conformance
+    suite — so it cannot be the thing that registers a provider. Registration happens in
+    Jseal/VmProviderRegistration.cs, which is compiled only under the configurations that
+    link Broiler.VM.
+  -->
+  <ItemGroup Condition="'$(BroilerJavaScriptEngine)' == 'Vm'">
+    <ProjectReference Include="..\Broiler.JSeal.Vm\Broiler.JSeal.Vm.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Jseal\VmProviderRegistration.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BroilerJavaScriptEngine)' == 'Vm'">
+    <Compile Include="Jseal\VmProviderRegistration.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

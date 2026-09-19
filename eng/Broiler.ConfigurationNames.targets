@@ -1,0 +1,79 @@
+<Project>
+
+  <!--
+    ════════════════════════════════════════════════════════════════════
+    Declaring Debug-VM and Release-VM to every project
+    ════════════════════════════════════════════════════════════════════
+
+    EVERY PROJECT HAS TO DECLARE THE NAMES, NOT JUST BEHAVE CORRECTLY UNDER THEM.
+
+    `dotnet build <solution> -c Debug-VM` is content to hand a project a configuration the
+    project never mentioned, so the command line never noticed this was missing. Visual Studio
+    is not: it resolves a solution build type onto a project configuration OF THE SAME NAME and
+    checks the project has one. Opening a generated solution and choosing Debug-VM therefore
+    reported
+
+      Invalid project mappings. See log file
+
+    against 87 of the 88 projects in Broiler.Windows.Browser.slnx — every one whose
+    $(Configurations) was still the SDK default `Debug;Release`. Only src/Broiler.Browser.Windows
+    was fine, because it spells its own list out.
+
+    eng/Broiler.Configurations.props is what makes the names BEHAVE (decompose to a base
+    configuration, pick the engine). This file is what makes them EXIST. They are separate
+    problems and, as below, they cannot run at the same time.
+
+    ── Why this is a .targets and not part of the .props ─────────────────
+
+    A project's own <Configurations> is an unconditional assignment in the csproj body, which
+    MSBuild evaluates AFTER Directory.Build.props. Five projects here do that — the Windows
+    variants of Broiler.Graphics, Broiler.Input and Broiler.Media — and every value the props
+    side could have set is simply overwritten:
+
+      Debug;Release;Debug-Windows;Release-Windows
+
+    Appending from the props side reached 83 of the 88 and left exactly those five behind.
+    Directory.Build.targets is evaluated after the csproj body, so this is the only point that
+    sees what a project actually ended up declaring.
+
+    ── Why the import is unconditional ──────────────────────────────────
+
+    The mapping in Broiler.Configurations.props is imported from two places under a sentinel, so
+    that a project reached from the props side does not get it a second time from the targets
+    side. That is right for a decomposition, which must happen once, and wrong for this, which
+    must happen last. The append below is idempotent — it checks before adding — so it needs no
+    sentinel, and having none is what lets it run for the chaining projects too.
+
+    Directory.Build.targets is looked up separately from Directory.Build.props and only two exist
+    in the whole tree: this repository's and Broiler.JS's, which chains here explicitly. So this
+    reaches all 88 projects, including the four submodules whose Directory.Build.props does not
+    chain.
+
+    ── What a regression looks like ─────────────────────────────────────
+
+    Silence, and then a developer opening the solution in Visual Studio. Nothing on the command
+    line reports it, which is why ci.yml asserts that every project in the Windows solution
+    declares both names.
+  -->
+
+  <PropertyGroup>
+    <Configurations Condition="'$(Configurations)' == ''">Debug;Release</Configurations>
+
+    <!--
+      Delimited on both ends so that a substring test cannot match a longer name: without the
+      semicolons `Debug-VM` is a substring of a hypothetical `Debug-VM2`, and the append would be
+      skipped for a project that never declared it.
+
+      The test is a property function in a property VALUE rather than in a Condition on purpose.
+      MSBuild's condition parser does not read nested quotes reliably (MSB4092), and this file
+      exists because a configuration problem went unnoticed; it should not introduce another one.
+    -->
+    <BroilerConfigurationsProbe>;$(Configurations);</BroilerConfigurationsProbe>
+    <BroilerDeclaresDebugVm>$(BroilerConfigurationsProbe.Contains(';Debug-VM;'))</BroilerDeclaresDebugVm>
+    <BroilerDeclaresReleaseVm>$(BroilerConfigurationsProbe.Contains(';Release-VM;'))</BroilerDeclaresReleaseVm>
+
+    <Configurations Condition="'$(BroilerDeclaresDebugVm)' != 'true'">$(Configurations);Debug-VM</Configurations>
+    <Configurations Condition="'$(BroilerDeclaresReleaseVm)' != 'true'">$(Configurations);Release-VM</Configurations>
+  </PropertyGroup>
+
+</Project>

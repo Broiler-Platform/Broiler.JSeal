@@ -1,0 +1,183 @@
+<Project>
+
+  <!--
+    ════════════════════════════════════════════════════════════════════
+    VENDORED COPY. The canonical file is Broiler.Browser's eng/Broiler.Configurations.props,
+    and this is one of the copies its own comments call "a vendored copy": a component that
+    must decompose Debug-VM/Release-VM with no parent repository above it.
+
+    Broiler.HtmlBridge is unusual in vendoring it AND chaining to the parent when there is
+    one, because the -VM pair is this component's own pair rather than something a parent
+    imposes. Both guards below are what keep the two runs to a single decomposition; read
+    them before editing either copy.
+
+    A few passages below describe the BROWSER's tree - which submodules chain, and
+    src/Broiler.Browser.Core being the one site that reads $(BroilerJavaScriptEngine). They
+    are left as written because they explain why the mechanism is shaped this way. What is
+    true here: the property selects Broiler.HtmlBridge.Scripting.Vm and
+    Broiler.HtmlBridge.Jseal.Vm, and it defines BROILER_VM_JS, which the VM-only test cases
+    are guarded on.
+    ════════════════════════════════════════════════════════════════════
+  -->
+
+  <!--
+    ════════════════════════════════════════════════════════════════════
+    Broiler build configurations
+    ════════════════════════════════════════════════════════════════════
+
+    The repository builds more configuration names than the two MSBuild knows
+    about. Each one decomposes into a BASE configuration (Debug or Release,
+    which decides symbols and optimisation) and one AXIS the name adds:
+
+      Debug        Release            the base configurations
+      Debug-Linux  Release-Linux      pin linux-x64 on the Linux head
+      Debug-Windows Release-Windows   pin win-x64 on the Windows head
+      Debug-VM     Release-VM         run script on the Broiler.VM JavaScript
+                                      profile instead of Broiler.JS
+
+    WITHOUT THIS MAPPING A NAMED CONFIGURATION SILENTLY BUILDS AS NEITHER. The
+    SDK keys DebugSymbols off `Configuration == 'Debug'` and Optimize off
+    `Configuration == 'Release'`, so `-c Release-VM` compiles UNOPTIMISED and
+    `-c Debug-VM` compiles WITHOUT SYMBOLS — a build that succeeds and is wrong
+    in a way nothing reports. Evaluating any project here proves it:
+
+      dotnet msbuild <project> -p:Configuration=Release-VM -getProperty:Optimize
+
+    answers empty until this file runs, and `true` after.
+
+    ── Why this is a separate file ───────────────────────────────────────
+
+    It is imported TWICE, from two places, because the mapping has to reach
+    projects the root Directory.Build.props cannot:
+
+      Directory.Build.props    — for every project that chains to the root.
+      Directory.Build.targets  — for the ones that do not.
+
+    FOUR submodules carry a Directory.Build.props that deliberately does not
+    chain to a parent: Broiler.Input, Broiler.JS, Broiler.Media and Broiler.VM.
+    (Broiler.VM's says so in a comment and gives the reason: chaining would
+    inherit this repository's suppression list and silence diagnostics a new
+    component has no legacy reason to suppress.) MSBuild stops at the first
+    Directory.Build.props it finds, so the root's never runs for any of them —
+    but Directory.Build.targets is looked up separately, and that is the
+    asymmetry the second import exploits.
+
+    Three of the four have no Directory.Build.targets at all, so the root's
+    reaches them without their doing anything. Broiler.JS has one, and it used
+    to stop the lookup dead; it now chains to its parent explicitly, so it
+    arrives here by a third route to the same place. That is a file in that
+    submodule rather than this one — docs/vm-javascript-profile.md says why.
+
+    It matters now because Debug-VM/Release-VM are the first configurations
+    whose project graph reaches INTO Broiler.VM. Release-Linux never did, so
+    the gap cost nothing and stayed invisible.
+
+    ── Overriding without switching configuration ────────────────────────
+
+    $(BroilerJavaScriptEngine) is a property, not a literal test on the
+    configuration name, so a developer can build any configuration against
+    either engine:
+
+      dotnet build ... -p:BroilerJavaScriptEngine=Vm
+
+    ── What this file does NOT do ────────────────────────────────────────
+
+    It makes the names BEHAVE. It does not make projects DECLARE them, which is a
+    separate problem with a separate answer in eng/Broiler.ConfigurationNames.targets
+    — separate because a project's own <Configurations> is evaluated after this and
+    overwrites it, so the declaration has to run later than the mapping can.
+
+    Leaving that undone did not break any build; it broke opening the solution in
+    Visual Studio, which is the one reader that checks.
+  -->
+
+  <!--
+    TWO GROUPS WITH TWO GUARDS, BECAUSE THERE ARE TWO WAYS TO ARRIVE HERE TWICE AND THEY DO NOT
+    COVER THE SAME PROPERTIES.
+
+    $(BroilerConfigurationMappingApplied) stops the props-side and targets-side imports in THIS
+    repository from both firing for one project. It guards the first group.
+
+    '$(BroilerBaseConfiguration)' == '' guards the second group and stops something else: four
+    submodules — Broiler.Input,
+    Broiler.JS, Broiler.Media and Broiler.UI — carry their own VENDORED COPY of this mapping,
+    which runs at props time and knows the four -Linux/-Windows names. For those names the
+    configuration is already decomposed by the time the targets-side import gets here, and
+    re-decomposing it appended DEBUG or RELEASE and LINUX or WINDOWS a second time:
+
+      Broiler.Input at Release-Windows  ;RELEASE;WINDOWS;TRACE;RELEASE;WINDOWS;RELEASE_WINDOWS
+
+    A duplicate conditional symbol is harmless to the compiler, but a constants list that reads
+    differently depending on which component you ask is a bad way to answer the question this
+    file exists to make answerable. A vendored copy that does NOT know the configuration — every
+    one of them at Debug-VM/Release-VM — leaves the property empty, so this still runs and is
+    still what maps those names.
+
+    Broiler.UI was for a while a duplicate neither condition could reach: it chains to the root
+    props AND carries a copy, so both ran at props time, where the targets-side guard never gets
+    a say. It now applies the same '$(BroilerBaseConfiguration)' == '' test to its own copy, which
+    is the only side that could fix it.
+
+    ── Why the engine selection is in a group of its own ──────────────────
+
+    Only the DECOMPOSITION is skipped when a vendored copy already did it. The engine selection
+    below is not, because no vendored copy has ever heard of it: putting it under the same guard
+    made Broiler.Input, Broiler.JS and Broiler.Media answer $(BroilerJavaScriptEngine) as EMPTY at
+    the four -Linux/-Windows names while every other component answered `BroilerJs`. Inert, since
+    only src/Broiler.Browser.Core reads it — and exactly the "the answer depends on which
+    component you ask" defect the guard above exists to remove, one property over.
+  -->
+  <PropertyGroup Condition="'$(BroilerConfigurationMappingApplied)' != 'true'">
+    <BroilerConfigurationMappingApplied>true</BroilerConfigurationMappingApplied>
+
+    <!--
+      WHICH JAVASCRIPT ENGINE THE BROWSER'S SCRIPT ENGINE IS. `BroilerJs` is the
+      default and what every configuration outside the -VM pair builds.
+
+      `Vm` does NOT remove Broiler.JS from the graph. The second half of that sentence
+      used to be "and cannot", on the grounds that the profile's host-capability ABI is
+      opaque bytes (VmBytes -> VmOpaqueRef) and a DOM cannot be projected through one.
+      That argument is true about the capability channel and was never about the whole
+      engine: the profile publishes an in-realm host surface a DOM-shaped embedder can
+      use, and src/Broiler.HtmlBridge.Jseal.Vm is a JSEAL provider over it that declares
+      JsCapabilities.Document. What keeps Broiler.JS in the graph is this repository's
+      own seam — IDomBridgeRuntime.Attach takes a JSContext — and not the VM.
+
+      What `Vm` selects is which IScriptEngine the browser instantiates — see
+      docs/vm-javascript-profile.md for what that engine does and does not run on the VM,
+      and docs/jseal.md for the provider.
+    -->
+    <BroilerJavaScriptEngine Condition="'$(BroilerJavaScriptEngine)' == '' And ('$(Configuration)' == 'Debug-VM' Or '$(Configuration)' == 'Release-VM')">Vm</BroilerJavaScriptEngine>
+    <BroilerJavaScriptEngine Condition="'$(BroilerJavaScriptEngine)' == ''">BroilerJs</BroilerJavaScriptEngine>
+
+    <!--
+      The constant the ONE engine-selection site reads
+      (src/Broiler.Browser.Core/BrowserApp.cs). It is defined from the property
+      rather than from the configuration name so that -p:BroilerJavaScriptEngine=Vm
+      reaches the source as well as the project graph; a switch that changed the
+      references without changing the code would build the VM assemblies and never
+      call them — and it lives beside the property rather than beside the other
+      constants so that the two cannot disagree about which projects get it.
+    -->
+    <DefineConstants Condition="'$(BroilerJavaScriptEngine)' == 'Vm'">$(DefineConstants);BROILER_VM_JS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BroilerBaseConfiguration)' == ''">
+    <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Debug-VM'">Debug</BroilerBaseConfiguration>
+    <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Release-Linux' Or '$(Configuration)' == 'Release-Windows' Or '$(Configuration)' == 'Release-VM'">Release</BroilerBaseConfiguration>
+    <BroilerTargetOperatingSystem Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Release-Linux'">Linux</BroilerTargetOperatingSystem>
+    <BroilerTargetOperatingSystem Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows'">Windows</BroilerTargetOperatingSystem>
+
+    <DebugSymbols Condition="'$(BroilerBaseConfiguration)' == 'Debug'">true</DebugSymbols>
+    <DebugType Condition="'$(BroilerBaseConfiguration)' == 'Debug'">portable</DebugType>
+    <Optimize Condition="'$(BroilerBaseConfiguration)' == 'Debug'">false</Optimize>
+    <DefineConstants Condition="'$(BroilerBaseConfiguration)' == 'Debug'">$(DefineConstants);DEBUG</DefineConstants>
+    <DebugType Condition="'$(BroilerBaseConfiguration)' == 'Release'">portable</DebugType>
+    <Optimize Condition="'$(BroilerBaseConfiguration)' == 'Release'">true</Optimize>
+    <DefineConstants Condition="'$(BroilerBaseConfiguration)' == 'Release'">$(DefineConstants);RELEASE</DefineConstants>
+
+    <DefineConstants Condition="'$(BroilerTargetOperatingSystem)' == 'Linux'">$(DefineConstants);LINUX</DefineConstants>
+    <DefineConstants Condition="'$(BroilerTargetOperatingSystem)' == 'Windows'">$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+</Project>

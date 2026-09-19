@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.JSeal.BroilerJs</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>The Broiler.JS provider for JSEAL: an IJsEngineProvider and IJsRealm implemented over Broiler.JavaScript's JSContext, so hosts can bind through engine-neutral contracts without changing which engine actually runs.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.JSeal.Tests" />
+    <InternalsVisibleTo Include="Broiler.HtmlBridge.Tests" />
+    <InternalsVisibleTo Include="Broiler.Browser.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Broiler.JavaScript.BuiltIns" />
+    <PackageReference Include="Broiler.JavaScript.Globals" />
+    <PackageReference Include="Broiler.JavaScript.Storage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.JSeal\Broiler.JSeal.csproj" />
+  </ItemGroup>
+
+</Project>

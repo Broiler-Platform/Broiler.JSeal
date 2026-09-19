@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      package-version:
+        description: Resolved preview version for a publish run
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  PACKAGE_VERSION: ${{ inputs.package-version }}
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / Release
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Test preview version selection
+        run: node --test eng/resolve-preview-version.test.mjs
+
+      - name: Build (Release)
+        run: |
+          args=()
+          if [ -n "$PACKAGE_VERSION" ]; then
+            args+=("-p:Version=$PACKAGE_VERSION" "-p:PackageVersion=$PACKAGE_VERSION")
+          fi
+          dotnet build Broiler.JSeal.slnx -c Release --nologo "${args[@]}"
+
+      - name: Test (Release)
+        run: bash ./eng/run-tests.sh Release
+
+      - name: Build (Release-VM)
+        run: |
+          args=()
+          if [ -n "$PACKAGE_VERSION" ]; then
+            args+=("-p:Version=$PACKAGE_VERSION" "-p:PackageVersion=$PACKAGE_VERSION")
+          fi
+          dotnet build Broiler.JSeal.slnx -c Release-VM --nologo "${args[@]}"
+
+      - name: Test (Release-VM)
+        run: bash ./eng/run-tests.sh Release-VM
+
+      - name: Pack and verify every package
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: ./eng/pack.ps1 -Version $env:PACKAGE_VERSION
+
+      - name: Upload packages
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: nuget-packages
+          path: artifacts/*
+          if-no-files-found: error

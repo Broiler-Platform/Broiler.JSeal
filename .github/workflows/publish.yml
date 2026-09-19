@@ -1,0 +1,131 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which feed to publish to
+        type: choice
+        options: [github, nuget]
+        default: github
+      version-suffix:
+        description: 'Optional preview.N (unused and at least the next preview). Empty selects automatically.'
+        type: string
+        default: ''
+      dry-run:
+        description: Validate and attach packages without pushing to the feed
+        type: boolean
+        default: true
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Resolve preview version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      TARGET: ${{ github.event_name == 'push' && 'nuget' || inputs.target }}
+      DRY_RUN: ${{ github.event_name == 'push' && 'false' || inputs.dry-run }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Require a NuGet.org API key
+        if: env.TARGET == 'nuget' && env.DRY_RUN != 'true'
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::Publishing to nuget.org needs the NUGET_API_KEY repository secret."
+            exit 1
+          fi
+      - name: Resolve version
+        id: version
+        env:
+          VERSION_SUFFIX: ${{ inputs.version-suffix }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node eng/resolve-preview-version.mjs
+
+  validate:
+    name: Validate and pack
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    with:
+      package-version: ${{ needs.version.outputs.version }}
+
+  publish:
+    name: Publish to ${{ github.event_name == 'push' && 'nuget' || inputs.target }}
+    needs: [version, validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TARGET: ${{ github.event_name == 'push' && 'nuget' || inputs.target }}
+      DRY_RUN: ${{ github.event_name == 'push' && 'false' || inputs.dry-run }}
+      PACKAGE_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check out
+        uses: actions/checkout@v7
+      - name: Download validated packages
+        uses: actions/download-artifact@v8
+        with:
+          name: nuget-packages
+          path: artifacts
+      - name: Verify consumer restore from the destination feed
+        shell: pwsh
+        env:
+          NuGetPackageSourceCredentials_github: Username=${{ github.actor }};Password=${{ secrets.GITHUB_TOKEN }};ValidAuthenticationTypes=Basic
+        run: ./eng/verify-feed.ps1 -Target $env:TARGET
+      - name: Push to GitHub Packages
+        if: env.TARGET == 'github' && env.DRY_RUN != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          dotnet nuget push 'artifacts/*.nupkg'
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --api-key "$GITHUB_TOKEN" --no-symbols
+      - name: Push to NuGet.org
+        if: env.TARGET == 'nuget' && env.DRY_RUN != 'true'
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: >
+          dotnet nuget push 'artifacts/*.nupkg'
+          --source https://api.nuget.org/v3/index.json
+          --api-key "$NUGET_API_KEY"
+      - name: Summary
+        run: |
+          {
+            echo "### Broiler.JSeal $PACKAGE_VERSION"
+            echo
+            if [ "$DRY_RUN" = "true" ]; then
+              echo 'Dry run: validated packages are attached; nothing was pushed.'
+            else
+              echo "Published to $TARGET."
+            fi
+            echo
+            echo '```'
+            ls -1 artifacts
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,20 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+
+# Test / publish artifacts
+[Pp]ublish/
+artifacts/
+*.binlog
+
+# NuGet pack output (packages are published from CI/local artifacts, never committed)
+*.nupkg
+*.snupkg
+
+# Test runner output; CI uploads the directory as an artifact rather than committing it.
+test-results/

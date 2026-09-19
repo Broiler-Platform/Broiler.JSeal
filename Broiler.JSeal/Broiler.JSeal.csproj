@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.JSeal</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>JSEAL — the JavaScript Engine Abstraction Layer. Engine-neutral contracts between HTML/DOM hosts and JavaScript engines, so which JavaScript engine runs a page is a provider choice rather than a compile-time fact.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.JSeal.BroilerJs" />
+    <InternalsVisibleTo Include="Broiler.JSeal.Vm" />
+    <InternalsVisibleTo Include="Broiler.JSeal.Tests" />
+    <InternalsVisibleTo Include="Broiler.HtmlBridge" />
+    <InternalsVisibleTo Include="Broiler.HtmlBridge.Dom" />
+    <InternalsVisibleTo Include="Broiler.HtmlBridge.Tests" />
+    <InternalsVisibleTo Include="Broiler.Browser.Core.Tests" />
+  </ItemGroup>
+
+  <!--
+    THIS PROJECT HAS NO ProjectReference AND NO PackageReference, AND THAT IS THE POINT.
+
+    Engine neutrality is asserted by the compiler: an assembly that references nothing cannot name
+    a Broiler.JavaScript type, a Broiler.VM type, or anything either of them drags in. If a future
+    change needs one, the reference has to be added here first, in a diff a reviewer sees, rather
+    than arriving transitively through a helper.
+  -->
+
+</Project>

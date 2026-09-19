@@ -1,0 +1,33 @@
+<Project>
+
+  <!-- Configuration mapping for Debug-VM / Release-VM build types -->
+  <Import Project="$(MSBuildThisFileDirectory)eng\Broiler.Configurations.props" />
+
+  <!-- Broiler NuGet packaging metadata (vendored; do not edit by hand). -->
+  <Import Project="$(MSBuildThisFileDirectory)eng\Broiler.Packaging.props" />
+
+  <!-- Repository-owned packaging overrides. -->
+  <PropertyGroup>
+    <PackageProjectUrl>https://github.com/Broiler-Platform/Broiler.JSeal</PackageProjectUrl>
+    <PackageTags>broiler;jseal;javascript;engine;abstraction;interop;realm</PackageTags>
+  </PropertyGroup>
+
+  <!--
+    ════════════════════════════════════════════════════════════════════
+    THE TWO DIAGNOSTICS THIS COMPONENT PROMOTES TO ERRORS.
+
+    Both are about JsValue — the JSEAL handle in Broiler.JSeal/Values/JsValue.cs.
+    It is a STRUCT, and the engine-typed storage it replaced was a class.
+    Promoting CA2013 and CS8073 ensures struct null-comparison bugs are caught
+    at compile time rather than silently failing open.
+    ════════════════════════════════════════════════════════════════════
+  -->
+  <PropertyGroup>
+    <WarningsAsErrors>$(WarningsAsErrors);CA2013;CS8073</WarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8620;CS8622;CS8625;CS8631;CS8632;CS8765;CS8767;CS9113;CA1416;CA2255;SYSLIB0013</NoWarn>
+  </PropertyGroup>
+
+</Project>
