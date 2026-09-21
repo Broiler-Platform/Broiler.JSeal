@@ -1,7 +1,6 @@
 ﻿using Broiler.JSeal.Providers;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
-using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
@@ -65,18 +64,15 @@ internal static class BroilerJsMarshal
     /// <para>
     /// <b>A CLR <see langword="null"/> is <see cref="JsValue.Missing"/>, not <c>undefined</c>.</b>
     /// Broiler.JS's <c>Arguments</c> indexer answers null for an index past the end, and the bridge's
-    /// argument reads (598 on 2026-09-08) are entitled to tell "not passed" from "passed undefined".
+    /// argument reads are entitled to tell "not passed" from "passed undefined".
     /// This is the single line that keeps that true; every other reader of an argument goes through
     /// <c>JsCall</c>, which is filled from here.
     /// </para>
     /// <para>
-    /// <b>The type tests run most-derived first, and <c>JSContext</c> is why the object arm is
-    /// written against <c>JSObject</c>.</b> A realm's global under this engine <em>is</em> its
-    /// <c>JSContext</c>, which derives from <c>JSObject</c> and is itself a <c>JSValue</c>. A test
-    /// that named a narrower type, or that asked <c>IsObject</c> before asking about functions and
-    /// arrays, would either lose the global or flatten a callable into an ordinary object â€” and the
-    /// bridge asks "is this callable" often enough that answering it later, from the engine, is the
-    /// cost this kind exists to avoid.
+    /// Callability is an engine predicate, not a CLR type test: callable proxies derive from
+    /// <c>JSObject</c>, and retain callability after revocation. Store the proxy itself to preserve
+    /// its identity. Array classification still means an actual <c>JSArray</c>, not a proxy to one.
+    /// The general object arm also covers the realm's global <c>JSContext</c>.
     /// </para>
     /// </remarks>
     internal static JsValue Wrap(JSValue? value)
@@ -94,7 +90,7 @@ internal static class BroilerJsMarshal
 
         return value switch
         {
-            JSFunction function => JsProviderValue.Function(function),
+            _ when value.IsFunction => JsProviderValue.Function(value),
             JSArray array => JsProviderValue.Array(array),
             JSObject @object => JsProviderValue.Object(@object),
             JSString @string => JsValue.String(@string.ToString()),

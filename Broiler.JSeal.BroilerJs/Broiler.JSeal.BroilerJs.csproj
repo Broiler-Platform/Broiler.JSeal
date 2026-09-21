@@ -17,6 +17,8 @@
   <ItemGroup>
     <PackageReference Include="Broiler.JavaScript.BuiltIns" />
     <PackageReference Include="Broiler.JavaScript.Globals" />
+    <!-- JSArguments and its builder initializer live here, including for classic scripts. -->
+    <PackageReference Include="Broiler.JavaScript.Modules" />
     <PackageReference Include="Broiler.JavaScript.Storage" />
   </ItemGroup>
 

@@ -26,60 +26,11 @@ internal sealed partial class VmRealm
     /// </remarks>
     public int DrainJobs(int limit = 10_000) => InStep(realm => realm.DrainJobs(limit));
 
-    /// <inheritdoc />
+    /// <summary>Create a promise through the captured intrinsic and retain its resolving functions.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>It builds the promise the way a page would, and that is the whole of why it can exist.</b>
-    /// The realm's own <c>Promise</c> â€” captured at creation, see <c>VmHostBridge.Promise</c> â€” is
-    /// handed an executor minted as a host method, and constructing with it yields the pair the
-    /// language itself created. So the promise is an ordinary promise of this realm and
-    /// <c>p instanceof Promise</c> holds for the page. Three members of the host surface do all of
-    /// it: <c>GetProperty</c>, <c>NewMethod</c> and <c>Construct</c>.
-    /// </para>
-    /// <para>
-    /// <b>What it does not do is track an unhandled rejection, because this profile does not.</b>
-    /// A rejection reaching a drain with no handler is silent here and is reported on Broiler.JS,
-    /// which is a difference between the two engines rather than a gap in this member â€” no JSEAL
-    /// contract asks for the tracking. It is written down because a bridge that relies on the
-    /// report would lose it quietly on this engine rather than loudly.
-    /// </para>
-    /// <para>
-    /// <b>This member used to refuse, and the reason it gave was wrong in a way worth keeping.</b>
-    /// It argued that the only way to fake a settleable promise was to EVALUATE a snippet that
-    /// captured the resolvers, and that a page whose Content-Security-Policy forbids evaluation
-    /// would then be asking <c>fetch</c> for a promise built on the capability it had just refused.
-    /// The objection is sound about the route it names and does not reach this one: evaluation is
-    /// not the only way to reach a constructor, and nothing above compiles a character. A realm
-    /// built with <c>AllowGuestEval: false</c> gets a working promise here, which is exactly the
-    /// case the old argument said could not exist. It is the same shape of mistake as the one
-    /// <c>docs/jseal.md</c> records about the capability channel: a true statement about one
-    /// mechanism, read as a statement about all of them.
-    /// </para>
-    /// <para>
-    /// <b>The executor runs synchronously and this depends on it rather than hoping for it.</b>
-    /// <c>new Promise(f)</c> has called <c>f</c> by the time it returns â€” the specification says so
-    /// and the profile implements it that way â€” so the resolvers are in hand the moment
-    /// <c>Construct</c> answers. A realm whose <c>Promise</c> did not do that would leave the
-    /// captures unset, and this refuses at that point rather than handing back two actions that
-    /// silently do nothing.
-    /// </para>
-    /// <para>
-    /// <b>Settling does not drain, and that is the contract's own ordering rather than an
-    /// accident.</b> A reaction is a job: it must not run at the moment the promise is settled, and
-    /// it must run at the next checkpoint the host takes. Calling the guest's <c>resolve</c> only
-    /// ever enqueues, and a settle made from outside a step takes a turn â€” <c>#host-turn</c>, which
-    /// runs the crossing and returns â€” rather than the profile's separate <c>#drain-jobs</c>. So
-    /// nothing here runs guest reactions inside the host's own frame at a point no page could have
-    /// predicted.
-    /// </para>
-    /// <para>
-    /// <b>Both actions stay valid for the life of the realm, and refuse after it.</b> The captured
-    /// functions are ordinary guest objects whose identity the profile keys on a weak table, so a
-    /// handle held across turns still names the same function; a settle attempted after
-    /// <see cref="Dispose"/> meets the same <see cref="ObjectDisposedException"/> every other member
-    /// raises, because a host that resolves a <c>fetch</c> after the document it belonged to was
-    /// torn down has made a mistake worth hearing about.
-    /// </para>
+    /// The intrinsic constructor runs the host executor synchronously, so this needs no source evaluation
+    /// and works without GuestEval. Settlement uses the owning realm's step, queues reactions without
+    /// draining them, and refuses after disposal. JSEAL defines no unhandled-rejection reporting contract.
     /// </remarks>
     public JsValue NewPromise(out Action<JsValue> resolve, out Action<JsValue> reject)
     {

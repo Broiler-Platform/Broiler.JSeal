@@ -1,4 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 using Broiler.VM.Profile.JavaScript;
 
@@ -41,13 +43,16 @@ internal sealed partial class VmRealm
     public JsValue NewExotic(IJsExotic handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
+        ThrowIfDisposed();
 
         if ((Capabilities & JsCapabilities.ExoticObjects) == 0)
             throw Lacking(JsCapabilities.ExoticObjects);
 
         return InStep(realm =>
         {
-            var exotic = realm.NewExotic(new VmExoticObject(handler));
+            var completion = new VmExoticObject(handler);
+            var exotic = realm.NewExotic(completion);
+            completion.Target = exotic;
 
             return VmMarshal.Wrap(
                 handler is IJsExoticDelete deleter ? Deleting(realm, exotic, deleter) : exotic);
@@ -189,6 +194,8 @@ internal sealed partial class VmRealm
     /// </remarks>
     public JsValue NewArrayBuffer(ReadOnlySpan<byte> bytes)
     {
+        ThrowIfDisposed();
+
         if ((Capabilities & JsCapabilities.BinaryData) == 0)
             throw Lacking(JsCapabilities.BinaryData);
 
@@ -268,6 +275,8 @@ internal sealed partial class VmRealm
     /// </remarks>
     public bool TryGetArrayBufferBytes(JsValue value, [NotNullWhen(true)] out byte[]? bytes)
     {
+        ThrowIfDisposed();
+
         if ((Capabilities & JsCapabilities.BinaryData) == 0)
             throw Lacking(JsCapabilities.BinaryData);
 
@@ -401,55 +410,57 @@ internal sealed partial class VmRealm
         return value.AsBoolean;
     }
 
-    /// <summary>
-    /// Wraps a JSEAL host body in the shape the VM realm calls.
-    /// </summary>
+    private const int InlineArgumentCapacity = 8;
+
+    // JsValue contains managed references, so use a GC-tracked inline array, not stackalloc.
+    [InlineArray(InlineArgumentCapacity)]
+    private struct ArgumentBuffer
+    {
+#pragma warning disable IDE0051 // Storage for the inline array.
+        private JsValue _element0;
+#pragma warning restore IDE0051
+    }
+
+    /// <summary>Wraps a JSEAL host body in the shape the VM realm calls.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>The call frame is built on this frame's own stack and nothing is allocated per call</b>
-    /// beyond the handle conversion the two value models make unavoidable. <see cref="JsCall"/> is a
-    /// <see langword="ref"/> struct over a span, which is what lets the arguments live here.
-    /// </para>
-    /// <para>
-    /// <b>Nothing is caught.</b> A body that throws is a body whose exception has to reach the
-    /// engine and become something the page can catch, and the VM's own trampoline does that
-    /// translation - so catching here would be intercepting a throw on its way to the only code that
-    /// knows what to do with it.
-    /// </para>
+    /// Up to eight arguments use this invocation's inline buffer. Larger calls rent an array and
+    /// clear its references in finally, including when conversion or the body throws. Each recursive
+    /// invocation owns its buffer until its body returns. This removes the adapter's argument-array
+    /// allocation; the VM host API still projects arguments into its own array before calling here.
+    /// Guest exceptions retain their thrown value; ordinary host exceptions propagate unchanged.
     /// </remarks>
     private JsHostFunction Trampoline(JsNativeFunction body) =>
         (realm, thisValue, arguments) =>
         {
-            var converted = arguments.Length == 0
-                ? []
-                : new JsValue[arguments.Length];
-
-            for (var at = 0; at < arguments.Length; at++)
-                converted[at] = VmMarshal.Wrap(arguments[at]);
-
-            var call = new JsCall(
-                this,
-                VmMarshal.Wrap(thisValue),
-                converted,
-                VmMarshal.Wrap(realm.NewTarget));
+            var buffer = default(ArgumentBuffer);
+            JsValue[]? rented = null;
+            Span<JsValue> converted = arguments.Length <= InlineArgumentCapacity
+                ? buffer[..arguments.Length]
+                : (rented = ArrayPool<JsValue>.Shared.Rent(arguments.Length)).AsSpan(0, arguments.Length);
 
             try
             {
+                for (var at = 0; at < arguments.Length; at++)
+                    converted[at] = VmMarshal.Wrap(arguments[at]);
+
+                var call = new JsCall(
+                    this,
+                    VmMarshal.Wrap(thisValue),
+                    converted,
+                    VmMarshal.Wrap(realm.NewTarget));
+
                 return VmMarshal.Unwrap(body(in call));
             }
             catch (JsEngineException raised) when (!raised.Thrown.IsMissing)
             {
-                // A HOST BODY THAT THREW A GUEST VALUE IS THROWING, NOT FAILING. `realm.Error` and
-                // `realm.DomError` answer with one of these so a body can write `throw
-                // realm.Error(...)`, and it has to arrive in the engine as the guest throw it
-                // carries rather than as a CLR exception unwinding through interpreter frames,
-                // which is a state no `catch` in the page could reason about.
-                //
-                // THE ORIGINAL IS RETHROWN RATHER THAN REBUILT. The engine's own throw type is the
-                // engine's to construct, and rebuilding one from the outside would mean this
-                // assembly deciding what a guest throw is - so the wrapper is unwrapped and the
-                // exception the engine made goes back the way it came.
+                // Preserve the thrown value so guest code can catch it. The VM constructs its
+                // own exception; ordinary host failures pass through this adapter unchanged.
                 throw realm.Throw(VmMarshal.Unwrap(raised.Thrown));
+            }
+            finally
+            {
+                if (rented is not null)
+                    ArrayPool<JsValue>.Shared.Return(rented, clearArray: true);
             }
         };
 }

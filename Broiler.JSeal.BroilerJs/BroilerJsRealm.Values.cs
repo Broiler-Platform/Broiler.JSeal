@@ -33,20 +33,10 @@ internal sealed partial class BroilerJsRealm
         if (elements.IsEmpty)
             return BroilerJsMarshal.Wrap(new JSArray());
 
-        var items = new JSValue[elements.Length];
-        for (var i = 0; i < elements.Length; i++)
-            items[i] = BroilerJsMarshal.Unwrap(elements[i]);
-
-        return BroilerJsMarshal.Wrap(new JSArray(items));
+        return BroilerJsMarshal.Wrap(new JSArray(UnwrapAll(elements)));
     }
 
-    /// <inheritdoc />
-    /// <remarks>
-    /// The engine's own buffer type over a copy of the span. This provider pays nothing for the
-    /// contract because the type is the engine's and the bytes are a field on it; the other one has
-    /// no binary member on its host surface and reaches the realm's <c>ArrayBuffer</c> intrinsic
-    /// instead.
-    /// </remarks>
+    /// <summary>Create an ArrayBuffer over a copy of the supplied bytes.</summary>
     public JsValue NewArrayBuffer(ReadOnlySpan<byte> bytes)
     {
         using var scope = Enter();
@@ -71,6 +61,8 @@ internal sealed partial class BroilerJsRealm
     /// </remarks>
     public bool TryGetArrayBufferBytes(JsValue value, [NotNullWhen(true)] out byte[]? bytes)
     {
+        ThrowIfDisposed();
+
         if (BroilerJsMarshal.Unwrap(value) is not JSArrayBuffer buffer || buffer is SharedArrayBuffer)
         {
             bytes = null;
@@ -81,31 +73,8 @@ internal sealed partial class BroilerJsRealm
         return true;
     }
 
-    /// <summary>
-    /// A non-constructable host function.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b><c>createPrototype: false</c> is not an optimisation dial; it is what makes the function
-    /// non-constructable, which is what WebIDL requires of an operation or an attribute accessor.</b>
-    /// The engine's <c>JSConstructorOperations.IsConstructor</c> tests
-    /// <c>prototype != null || IsConstructable</c>, so a function built with a prototype object can be
-    /// <c>new</c>-ed â€” and <c>el.setAttribute.prototype</c> would answer an object where a browser
-    /// answers <c>undefined</c>.
-    /// </para>
-    /// <para>
-    /// It is also the memory fix <c>DomBridge/DomFunction.cs</c> recorded, and the reason that file
-    /// existed -- it is deleted, and in this repository's history, because every member the bridge
-    /// installs now comes through here instead of through a bridge type the bridge had to remember
-    /// to use. A node's wrapper was built eagerly with roughly 149 own members on 2026-09-08, each of
-    /// which was allocating a <c>JSFunction</c> <em>plus</em> an unreachable prototype object plus
-    /// that object's <c>constructor</c> back-reference. Dropping the prototype roughly halved the
-    /// retained cost of a wrapper â€” the difference between a document of 10k script-created elements
-    /// fitting in the WPT per-test memory budget and being aborted. Every member the bridge installs
-    /// comes through here, so the same saving now belongs to the provider rather than to a bridge
-    /// type the bridge had to remember to use.
-    /// </para>
-    /// </remarks>
+    /// <summary>Create a callable host method without a constructor prototype.</summary>
+    /// <remarks>Non-constructable methods avoid allocating an unused prototype for each bound member.</remarks>
     public JsValue NewMethod(string name, JsNativeFunction body, int length = 0)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -117,15 +86,7 @@ internal sealed partial class BroilerJsRealm
         return BroilerJsMarshal.Wrap(function);
     }
 
-    /// <summary>
-    /// A constructable host function â€” an interface object a page may <c>new</c>.
-    /// </summary>
-    /// <remarks>
-    /// The same constructor with <c>createPrototype: true</c>, which mints the <c>prototype</c> object
-    /// an interface's members are installed on and makes the function pass the engine's constructor
-    /// test. The bridge had sixteen of these against 1,246 members on 2026-09-08, which is why this
-    /// is the method that has to be asked for by name and <see cref="NewMethod"/> is the default.
-    /// </remarks>
+    /// <summary>Create a constructable host function with a prototype.</summary>
     public JsValue NewConstructor(string name, JsNativeFunction body, int length = 0)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -150,17 +111,14 @@ internal sealed partial class BroilerJsRealm
     /// ECMAScript <c>ToString</c>.
     /// </summary>
     /// <remarks>
-    /// Broiler.JS spells this <c>JSValue.ToString()</c>, and on a <c>JSObject</c> that override runs
-    /// the object's own <c>toString</c> â€” page script, which may throw or re-enter the realm. That is
+    /// Broiler.JS spells this <c>JSValue.StringValue</c>. It performs primitive conversion with a
+    /// string hint, including <c>Symbol.toPrimitive</c>, and may throw or re-enter the realm. That is
     /// exactly why <see cref="JsValue.ToString"/> on the handle refuses to do it and answers
     /// <c>[object]</c> instead: the cheap rendering and the observable coercion are different
     /// questions, and only this one is entitled to run code.
     /// </remarks>
-    public string ToJsString(JsValue value)
-    {
-        using var scope = Enter();
-        return BroilerJsMarshal.Unwrap(value).ToString();
-    }
+    public string ToJsString(JsValue value) =>
+        Execute(value, static item => BroilerJsMarshal.Unwrap(item).StringValue);
 
     /// <summary>
     /// ECMAScript <c>ToNumber</c>.
@@ -170,11 +128,8 @@ internal sealed partial class BroilerJsRealm
     /// <c>ToPrimitive</c> with a number hint, which may reach a <c>valueOf</c> the page wrote, and on
     /// a Symbol it throws â€” as the specification says it must.
     /// </remarks>
-    public double ToNumber(JsValue value)
-    {
-        using var scope = Enter();
-        return BroilerJsMarshal.Unwrap(value).DoubleValue;
-    }
+    public double ToNumber(JsValue value) =>
+        Execute(value, static item => BroilerJsMarshal.Unwrap(item).DoubleValue);
 
     /// <summary>
     /// ECMAScript <c>ToBoolean</c>.

@@ -1,0 +1,229 @@
+{
+  "phase": "after",
+  "timestampUtc": "2026-09-21T10:51:16.2462448+00:00",
+  "framework": ".NET 10.0.12",
+  "os": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "tieredCompilation": "0",
+  "warmup": 128,
+  "iterations": 512,
+  "samples": 3,
+  "jsValueSize": 24,
+  "jsHostValueSize": 24,
+  "providerSha256": "5886aba866190452b9adb8276929a496fb2789af8a6bb0daf9ea1a96f6cad23a",
+  "adapterSourceSha256": "769d8a77d67ae8599038fe2f45441f5f6a6b34fb3c5dad0e10e4a3ce3ca50f69",
+  "vmAssembly": "Broiler.VM.Profile.JavaScript, Version=0.1.0.0, Culture=neutral, PublicKeyToken=null",
+  "vmAssemblySha256": "6b925c5925d1123f512837446ef16afe548581aa828a1bca9ab0fe43579b18b8",
+  "measurements": [
+    {
+      "arity": 0,
+      "mode": "adapter",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 0,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 0,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        98304,
+        98304,
+        98304
+      ],
+      "bytesPerCall": [
+        192,
+        192,
+        192
+      ]
+    },
+    {
+      "arity": 1,
+      "mode": "adapter",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 1,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        49152,
+        49152,
+        49152
+      ],
+      "bytesPerCall": [
+        96,
+        96,
+        96
+      ]
+    },
+    {
+      "arity": 1,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        172032,
+        172032,
+        172032
+      ],
+      "bytesPerCall": [
+        336,
+        336,
+        336
+      ]
+    },
+    {
+      "arity": 8,
+      "mode": "adapter",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 8,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        221184,
+        221184,
+        221184
+      ],
+      "bytesPerCall": [
+        432,
+        432,
+        432
+      ]
+    },
+    {
+      "arity": 8,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        430080,
+        430080,
+        430080
+      ],
+      "bytesPerCall": [
+        840,
+        840,
+        840
+      ]
+    },
+    {
+      "arity": 9,
+      "mode": "adapter",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 9,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        245760,
+        245760,
+        245760
+      ],
+      "bytesPerCall": [
+        480,
+        480,
+        480
+      ]
+    },
+    {
+      "arity": 9,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        466944,
+        466944,
+        466944
+      ],
+      "bytesPerCall": [
+        912,
+        912,
+        912
+      ]
+    },
+    {
+      "arity": 32,
+      "mode": "adapter",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 32,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        811008,
+        811008,
+        811008
+      ],
+      "bytesPerCall": [
+        1584,
+        1584,
+        1584
+      ]
+    },
+    {
+      "arity": 32,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        1314816,
+        1314816,
+        1314816
+      ],
+      "bytesPerCall": [
+        2568,
+        2568,
+        2568
+      ]
+    }
+  ]
+}

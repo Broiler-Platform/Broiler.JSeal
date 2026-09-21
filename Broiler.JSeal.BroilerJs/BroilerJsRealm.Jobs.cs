@@ -61,11 +61,8 @@ internal sealed partial class BroilerJsRealm
         var ran = 0;
         while (ran < limit && _jobs.TryDequeue(out var job))
         {
-            // Per job rather than around the loop: a job may be the last one, and holding the realm
-            // current after the queue drains would leave the thread pointing at a realm nobody asked
-            // it to be in.
-            using var scope = Enter();
-            job();
+            // Translate guest throws while leaving host exceptions and the remaining queue intact.
+            Execute(job, static action => action());
             ran++;
         }
 
@@ -73,7 +70,14 @@ internal sealed partial class BroilerJsRealm
     }
 
     /// <inheritdoc />
-    public bool HasPendingJobs => _jobs.Count > 0;
+    public bool HasPendingJobs
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _jobs.Count > 0;
+        }
+    }
 
     /// <summary>
     /// A new pending promise, with the two functions that settle it.
@@ -106,8 +110,10 @@ internal sealed partial class BroilerJsRealm
 
         var promise = new JSPromise((engineResolve, engineReject) =>
         {
-            capturedResolve = value => engineResolve(BroilerJsMarshal.Unwrap(value));
-            capturedReject = value => engineReject(BroilerJsMarshal.Unwrap(value));
+            // A settler can run thenable getters and enqueue reactions, including when another
+            // realm is currently executing. It must enter this realm and use this realm's pump.
+            capturedResolve = value => Execute((engineResolve, value), static s => s.engineResolve(BroilerJsMarshal.Unwrap(s.value)));
+            capturedReject = value => Execute((engineReject, value), static s => s.engineReject(BroilerJsMarshal.Unwrap(s.value)));
         });
 
         if (capturedResolve is null || capturedReject is null)

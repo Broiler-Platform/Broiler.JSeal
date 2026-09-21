@@ -2,36 +2,12 @@
 
 namespace Broiler.JSeal;
 
-/// <summary>
-/// A JavaScript value, as the host sees it: a tag, an inline number, and â€” for anything the engine
-/// owns â€” an opaque reference to the engine's own value.
-/// </summary>
+/// <summary>An engine-neutral JavaScript value handle.</summary>
 /// <remarks>
-/// <para>
-/// <b>Why a struct rather than an interface hierarchy.</b> The obvious shape for this is
-/// <c>IJsValue</c> with <c>IJsObject</c>/<c>IJsFunction</c> beneath it, implemented by provider types
-/// that derive from the engine's own â€” and for objects that is exactly what happens (see
-/// <see cref="Reference"/>). It cannot be the shape for primitives, because Broiler.JS's
-/// <c>JSNumber</c> is <see langword="sealed"/>: a provider cannot derive from it, so an interface
-/// would force a carrier object per number, allocated on a path that already runs per property read.
-/// A three-field struct carries a number without allocating and an object without wrapping, which is
-/// the only shape that is cheap for both.
-/// </para>
-/// <para>
-/// The layout â€” tag plus <see cref="double"/> plus reference, 24 bytes â€” is not invented here. It is
-/// what Broiler.VM's own <c>JsValue</c> chose, for the reason it records: the collector is the CLR's,
-/// so a value that must sometimes hold a managed reference cannot be a NaN-boxed word. Matching it
-/// means the Broiler.VM provider re-tags rather than converts. (This said "a future" provider.)
-/// </para>
-/// <para>
-/// <b>What <see cref="Reference"/> holds is the engine's value, not a wrapper.</b> A provider mints an
-/// object handle over the object the engine already has. Under the Broiler.JS provider that is a
-/// <c>JSObject</c>, and the seven weak tables the bridge keys on <see cref="ObjectIdentity"/> â€” the
-/// wrapper registry's reverse map and the Blob, NamedNodeMap, ElementInternals, Range, Selection and
-/// PermissionStatus stores â€” key on the engine's own instances; <c>el === el</c> holds because it is
-/// the same question it was before. A provider that hands over anything else must canonicalise it,
-/// as the Broiler.VM provider does with one box per <c>JsHostRef</c>; see <c>docs/jseal.md</c>.
-/// </para>
+/// The kind, numeric field and opaque reference represent primitives without a separate carrier
+/// object per value. Providers maintain canonical identity for object references. The layout is
+/// 24 bytes on measured x64 builds, not a wire format. Cheap inspections never enter the engine;
+/// coercion belongs to IJsValues. BigInt is opaque and has documented truthiness/equality limits.
 /// </remarks>
 public readonly struct JsValue : IEquatable<JsValue>
 {
@@ -177,27 +153,11 @@ public readonly struct JsValue : IEquatable<JsValue>
         _ => double.NaN,
     };
 
-    /// <summary>
-    /// This value as a boolean, using ECMAScript truthiness, without calling into the engine â€” for
-    /// every kind except <see cref="JsValueKind.BigInt"/>, which this answers wrongly for zero.
-    /// </summary>
+    /// <summary>Cheap truthiness inspection; use IJsValues.ToBoolean when BigInt is possible.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>This summary used to say "every object is truthy, so no engine call is needed for any kind".
-    /// The reason was about objects and the conclusion was about kinds, and one kind falls between
-    /// them.</b> The switch below sends everything above <see cref="JsValueKind.String"/> to
-    /// <see langword="true"/>. That is right for a symbol and for every object, function and array,
-    /// and wrong for <c>0n</c>, whose ToBoolean is <see langword="false"/>.
-    /// <see cref="JsValueKind.BigInt"/> is 7 and <see cref="JsValueKind.Object"/> is 8, so the BigInt
-    /// was never one of the objects the sentence was reasoning about.
-    /// </para>
-    /// <para>
-    /// <b>It cannot be fixed here.</b> A BigInt handle carries the provider's own value as an opaque
-    /// reference, so this assembly has nothing to test. <see cref="IJsValues.ToBoolean"/> answers that
-    /// kind. This member stays, because every other kind is decidable from the handle and the bridge
-    /// reads truthiness where a crossing per read would be the cost of the abstraction; whether a site
-    /// can be handed a BigInt is a question about where its value came from.
-    /// </para>
+    /// Missing, Undefined and Null are false; booleans, numbers and strings use their stored value.
+    /// Reference kinds return true. BigInt is an opaque reference, so this member cannot distinguish
+    /// zero from nonzero BigInts; only its provider can do that.
     /// </remarks>
     public bool AsBoolean => _kind switch
     {
@@ -236,25 +196,11 @@ public readonly struct JsValue : IEquatable<JsValue>
         _ => "[object]",
     };
 
-    /// <summary>
-    /// ECMAScript strict equality (<c>===</c>) as far as it can be decided without entering the
-    /// engine â€” which is every kind but <see cref="JsValueKind.BigInt"/>, because <c>===</c> never
-    /// coerces.
-    /// </summary>
+    /// <summary>Strict equality for kinds whose value is available without entering the engine.</summary>
     /// <remarks>
-    /// <para>
-    /// NaN is not equal to itself here, as the language says. <see cref="Equals(JsValue)"/> deliberately
-    /// differs on exactly that one case; see its remarks.
-    /// </para>
-    /// <para>
-    /// <b>This summary used to say "which is all of it", and it was short by the kind
-    /// <see cref="AsBoolean"/> is short by.</b> BigInt strict equality compares mathematical values, and
-    /// a BigInt handle falls to the reference arm below. The Broiler.JS provider's engine allocates a
-    /// fresh value for every BigInt literal it evaluates and every BigInt it computes, so two handles
-    /// over equal BigInts minted separately compare unequal here where <c>===</c> says they are equal.
-    /// Recorded rather than changed: an honest answer needs a provider, as truthiness does, and no
-    /// contract member for it exists.
-    /// </para>
+    /// NaN is unequal to itself; Equals is reflexive for .NET collection use. Object kinds compare by
+    /// canonical identity. BigInt also compares by reference, so independently created equal BigInts
+    /// may compare unequal here; mathematical BigInt equality is not currently a realm contract.
     /// </remarks>
     public static bool operator ==(JsValue left, JsValue right)
     {

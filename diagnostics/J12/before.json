@@ -1,0 +1,229 @@
+{
+  "phase": "before",
+  "timestampUtc": "2026-09-21T10:44:58.2538+00:00",
+  "framework": ".NET 10.0.12",
+  "os": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "tieredCompilation": "0",
+  "warmup": 128,
+  "iterations": 512,
+  "samples": 3,
+  "jsValueSize": 24,
+  "jsHostValueSize": 24,
+  "providerSha256": "1db9c20e768a3a6c4da95464b995f382336ed54b22f2d8d787158696a10e6c9b",
+  "adapterSourceSha256": "d390dce1b3205b4a7387c26fac4420ce5b6d97b83d51b6ce81669b9e63997b53",
+  "vmAssembly": "Broiler.VM.Profile.JavaScript, Version=0.1.0.0, Culture=neutral, PublicKeyToken=null",
+  "vmAssemblySha256": "6b925c5925d1123f512837446ef16afe548581aa828a1bca9ab0fe43579b18b8",
+  "measurements": [
+    {
+      "arity": 0,
+      "mode": "adapter",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 0,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        0,
+        0,
+        0
+      ],
+      "bytesPerCall": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "arity": 0,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        98304,
+        98304,
+        98304
+      ],
+      "bytesPerCall": [
+        192,
+        192,
+        192
+      ]
+    },
+    {
+      "arity": 1,
+      "mode": "adapter",
+      "allocatedBytes": [
+        24576,
+        24576,
+        24576
+      ],
+      "bytesPerCall": [
+        48,
+        48,
+        48
+      ]
+    },
+    {
+      "arity": 1,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        49152,
+        49152,
+        49152
+      ],
+      "bytesPerCall": [
+        96,
+        96,
+        96
+      ]
+    },
+    {
+      "arity": 1,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        196608,
+        196608,
+        196608
+      ],
+      "bytesPerCall": [
+        384,
+        384,
+        384
+      ]
+    },
+    {
+      "arity": 8,
+      "mode": "adapter",
+      "allocatedBytes": [
+        110592,
+        110592,
+        110592
+      ],
+      "bytesPerCall": [
+        216,
+        216,
+        216
+      ]
+    },
+    {
+      "arity": 8,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        221184,
+        221184,
+        221184
+      ],
+      "bytesPerCall": [
+        432,
+        432,
+        432
+      ]
+    },
+    {
+      "arity": 8,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        540672,
+        540672,
+        540672
+      ],
+      "bytesPerCall": [
+        1056,
+        1056,
+        1056
+      ]
+    },
+    {
+      "arity": 9,
+      "mode": "adapter",
+      "allocatedBytes": [
+        122880,
+        122880,
+        122880
+      ],
+      "bytesPerCall": [
+        240,
+        240,
+        240
+      ]
+    },
+    {
+      "arity": 9,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        245760,
+        245760,
+        245760
+      ],
+      "bytesPerCall": [
+        480,
+        480,
+        480
+      ]
+    },
+    {
+      "arity": 9,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        589824,
+        589824,
+        589824
+      ],
+      "bytesPerCall": [
+        1152,
+        1152,
+        1152
+      ]
+    },
+    {
+      "arity": 32,
+      "mode": "adapter",
+      "allocatedBytes": [
+        405504,
+        405504,
+        405504
+      ],
+      "bytesPerCall": [
+        792,
+        792,
+        792
+      ]
+    },
+    {
+      "arity": 32,
+      "mode": "vm-host-roundtrip",
+      "allocatedBytes": [
+        811008,
+        811008,
+        811008
+      ],
+      "bytesPerCall": [
+        1584,
+        1584,
+        1584
+      ]
+    },
+    {
+      "arity": 32,
+      "mode": "jseal-roundtrip",
+      "allocatedBytes": [
+        1720320,
+        1720320,
+        1720320
+      ],
+      "bytesPerCall": [
+        3360,
+        3360,
+        3360
+      ]
+    }
+  ]
+}

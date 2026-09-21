@@ -35,18 +35,11 @@ public interface IJsEngineProvider
     IJsRealm CreateRealm(JsRealmOptions options);
 }
 
-/// <summary>
-/// What a host asks of a realm at the moment it is built â€” options a realm cannot be given
-/// afterwards.
-/// </summary>
+/// <summary>Options fixed when a realm is created or adopted.</summary>
 /// <remarks>
-/// <see cref="AllowGuestEval"/> is the one a host derives from the page's policy. Both providers
-/// fix it when they build the realm, and a page's <c>eval</c> in a realm built without it meets a
-/// refusal the page may catch. Broiler.VM's embedding contract expresses that policy by registering
-/// no artifact-provider capability, and <c>VmScriptEngine</c> does; <c>VmEngineProvider</c>
-/// cannot, because this repository's script and the page's classic scripts compile through the
-/// same artifact provider, so it registers one for every realm and that provider refuses the
-/// page's <c>eval</c> and <c>new Function</c> instead, though not while a host script is running.
+/// AllowGuestEval narrows dynamic evaluation without disabling host or classic script APIs.
+/// Each provider also enforces the restriction on guest eval and Function compilation. Host and
+/// classic evaluations do not grant guest callbacks permission to compile additional source.
 /// </remarks>
 public sealed class JsRealmOptions
 {
@@ -60,16 +53,14 @@ public sealed class JsRealmOptions
     public bool AllowGuestEval { get; init; } = true;
 
     /// <summary>
-    /// Whether the source this repository hands over through
-    /// <see cref="IJsSource.EvaluateHostScript"/> is run in strict mode regardless of what it says.
-    /// Neither provider forces a classic script. Broiler.VM does force a page's <c>eval</c> or
-    /// <c>new Function</c> compiled while that source is still running; Broiler.JS never does.
+    /// Whether EvaluateHostScript forces strict mode. Classic scripts retain their supplied strictness;
+    /// guest indirect eval and Function compilation use their own source's strictness on both providers.
     /// </summary>
     public bool ForceStrictMode { get; init; }
 
     /// <summary>
-    /// The document's URL, when there is one. A provider that resolves module specifiers or caches
-    /// compiled programs needs it as part of the identity of what it compiled.
+    /// Optional document URL metadata. Neither bundled provider currently uses this value for source
+    /// labels, module resolution or caching; its intended behavior is tracked by roadmap slice J17.
     /// </summary>
     public string? DocumentUrl { get; init; }
 

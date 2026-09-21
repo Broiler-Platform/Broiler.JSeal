@@ -74,24 +74,14 @@ internal sealed class VmHostBridge : IJsHostSurface
     /// every polyfill the bridge installs and taking whatever it returned as the result.
     /// </para>
     /// <para>
-    /// <b>The bypass is what that costs.</b> <see cref="VmSourceProvider"/> marks the evaluations
-    /// this repository authored so that a policy forbidding the page's <c>eval</c> does not forbid
-    /// the bridge's own polyfills, and the mark is held for the duration of the evaluation. With the
-    /// page's function standing in for <c>eval</c>, the page ran <em>inside</em> that mark - so a
-    /// realm built <c>AllowGuestEval: false</c> compiled whatever the page asked for. Measured on a
-    /// realm that forbids guest evaluation: <c>new Function('return 6 * 7')()</c> answered 42 from
-    /// inside a substituted <c>eval</c>.
+    /// <see cref="VmSourceProvider"/> authorizes one compilation for a host or classic script.
+    /// Capturing the intrinsic ensures that the authorized source reaches the compiler directly:
+    /// a page-supplied replacement must not run first and spend that permit on its own source.
     /// </para>
     /// <para>
-    /// One residual is left and is not a defect this closes: the mark is still held while the
-    /// evaluated script's own code runs, so host script that synchronously calls a page-supplied
-    /// function lends it the same permission. The bridge's host script does call page code. In
-    /// <c>DomBridge/Lifecycle.cs</c>, <c>broiler:window-onload</c> calls the page's <c>onload</c>,
-    /// and <c>broiler:body-load-event</c> calls <c>document.createEvent</c>, a member the bridge
-    /// installs writable, so a page can replace it. <c>IDomBridgeRuntime.Attach</c> still takes a
-    /// Broiler.JS context, so no page reaches that code in a realm of this provider yet. Closing the
-    /// residual properly means the profile carrying the distinction itself rather than this provider
-    /// standing in for it - which is the gap <see cref="VmSourceProvider"/> records.
+    /// The permit is consumed before the script executes. If host script subsequently invokes a
+    /// page callback, that callback's eval and Function requests still meet the realm's guest
+    /// policy. Both this capture and consumption before execution are required for the boundary.
     /// </para>
     /// </remarks>
     internal JsHostValue Eval { get; private set; }

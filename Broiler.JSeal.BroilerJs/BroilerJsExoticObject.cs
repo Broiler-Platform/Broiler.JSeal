@@ -49,7 +49,8 @@ internal sealed class BroilerJsExoticObject : JSObject
 {
     private readonly IJsExotic _handler;
     private readonly IJsExoticDelete? _deleter;
-    private uint _materialized;
+    private readonly HashSet<uint> _materialized = [];
+    private uint _indexedLength;
 
     internal BroilerJsExoticObject(BroilerJsRealm realm, IJsExotic handler)
     {
@@ -72,50 +73,18 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// </remarks>
     internal BroilerJsRealm Realm { get; }
 
-    /// <summary>
-    /// Brings the object's own indexed properties up to date with the handler, and returns how many
-    /// there now are.
-    /// </summary>
+    /// <summary>Refreshes handler-owned slots for the current dense range.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>The indices are made real rather than intercepted, and that is a fact about this engine's
-    /// property storage rather than about the DOM.</b> Answering indexed reads purely by overriding
-    /// the read hook works for everything written against <c>this[i]</c> and fails for everything
-    /// written against the object: <c>Array.prototype.map.call(list, â€¦)</c> reads <c>length</c>
-    /// correctly and then produces a hole per element, because an array generic asks whether index
-    /// <c>i</c> is <em>present</em> before reading it and an object with no own indexed properties
-    /// answers no. <c>Object.keys</c>, <c>forâ€¦in</c> and spread ask the same way. Presence,
-    /// enumeration and retrieval are separate entry points with no single hook between them, so the
-    /// indices are materialised instead and every generic algorithm then works without knowing what
-    /// the object is.
-    /// </para>
-    /// <para>
-    /// Called from each read entry point rather than on mutation, because a live collection has no
-    /// mutation of its own to hook â€” what it reflects is the tree, and the read is the only moment it
-    /// is known to matter. Shrinking matters as much as growing: an index whose element went away has
-    /// to stop being offered, not keep a stale handle at it.
-    /// </para>
-    /// <para>
-    /// This is what <see cref="IJsExotic.IndexedLength"/> exists for, and its documentation says so:
-    /// the length is asked for immediately before it is used, so a live collection reports what it
-    /// holds now rather than what it held when it was minted.
-    /// </para>
+    /// Indexed storage serves the engine's presence and enumeration paths. Ownership is tracked
+    /// separately so growth cannot overwrite ordinary properties and shrinkage removes only
+    /// handler slots. Explicit definitions and successful writes relinquish handler ownership.
     /// </remarks>
     private uint Sync()
     {
-        // RE-ENTRANCY GUARD, and it is not defensive programming â€” it closes a real stack overflow.
-        // Materialising an index is `this[i] = â€¦`, which the engine routes through SetIndexOnReceiver,
-        // which asks this object for the index's own descriptor. GetOwnPropertyDescriptor syncs
-        // first, as every read entry point must, so the write re-enters the sync that issued it and
-        // the recursion is unbounded. It aborted the whole test run rather than failing a test.
-        //
-        // A flag rather than dropping the sync from the descriptor path, because the descriptor path
-        // genuinely needs it when it is entered from outside â€” Object.keys asks for a descriptor per
-        // key â€” and a guard here protects every entry point, including ones added later, instead of
-        // making each one remember. Re-entering returns the length the outer call is establishing:
-        // the writes it has already done are visible, which is all the inner ask needs.
+        // A handler can re-enter the object while answering a lookup. The outer refresh owns
+        // synchronization; an inner read sees the slots already established rather than recursing.
         if (_syncing)
-            return _materialized;
+            return _indexedLength;
 
         _syncing = true;
         try
@@ -124,14 +93,25 @@ internal sealed class BroilerJsExoticObject : JSObject
 
             for (uint i = 0; i < length; i++)
             {
-                if (_handler.TryGetIndex(i, out var element))
-                    this[i] = BroilerJsMarshal.Unwrap(element);
+                if (!_handler.TryGetIndex(i, out var element))
+                    throw new InvalidOperationException($"IJsExotic must supply index {i} below IndexedLength ({length}).");
+
+                // Only refresh slots owned by the handler. Ordinary indexed properties, including
+                // undefined and accessors, retain precedence when the collection grows over them.
+                if (_materialized.Contains(i) || !GetElements(false).HasKey(i))
+                {
+                    FastAddValue(i, BroilerJsMarshal.Unwrap(element), JSPropertyAttributes.EnumerableConfigurableReadonlyValue);
+                    _materialized.Add(i);
+                }
             }
 
-            for (var i = length; i < _materialized; i++)
-                GetElements().RemoveAt(i);
+            foreach (var index in _materialized.Where(index => index >= length).ToArray())
+            {
+                base.Delete(index);
+                _materialized.Remove(index);
+            }
 
-            _materialized = length;
+            _indexedLength = length;
             return length;
         }
         finally
@@ -148,16 +128,16 @@ internal sealed class BroilerJsExoticObject : JSObject
     {
         Sync();
 
-        // Ordinary properties and the prototype chain FIRST. See the remarks on this class.
-        var resolved = base.GetValue(key, receiver, false);
-        if (resolved is not null && !resolved.IsUndefined)
-            return resolved;
+        // Presence is independent of the value: an ordinary property may be undefined, or
+        // a getter may return undefined (and even delete itself). Check before reading it,
+        // then perform exactly one read with the original receiver and error behavior.
+        if (base.HasProperty(key.ToJSValue()).BooleanValue)
+            return base.GetValue(key, receiver, throwError);
 
         if (_handler.TryGetNamed(key.ToString(), out var named))
             return BroilerJsMarshal.Unwrap(named);
 
-        // Re-entering the base with the caller's throwError so that a miss fails the way an ordinary
-        // miss on this object would, rather than being flattened to undefined here.
+        // Keep the caller's error behavior for a name neither ordinary storage nor the handler has.
         return base.GetValue(key, receiver, throwError);
     }
 
@@ -165,15 +145,35 @@ internal sealed class BroilerJsExoticObject : JSObject
     public override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         Sync();
-
-        var resolved = base.GetValue(key, receiver, false);
-        if (resolved is not null && !resolved.IsUndefined)
-            return resolved;
-
-        if (_handler.TryGetIndex(key, out var indexed))
-            return BroilerJsMarshal.Unwrap(indexed);
-
+        // Sync has installed every supplied index. An undefined ordinary value is still present.
         return base.GetValue(key, receiver, throwError);
+    }
+
+    /// <inheritdoc />
+    public override JSValue DefineProperty(uint key, JSObject descriptor)
+    {
+        var result = base.DefineProperty(key, descriptor);
+        if (!result.IsBoolean || result.BooleanValue)
+            _materialized.Remove(key);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public override bool SetValue(uint key, JSValue value, JSValue receiver, bool throwError = true)
+    {
+        var written = base.SetValue(key, value, receiver, throwError);
+        if (written && ReferenceEquals(receiver, this))
+            _materialized.Remove(key);
+        return written;
+    }
+
+    /// <inheritdoc />
+    public override JSValue Delete(uint key)
+    {
+        var result = base.Delete(key);
+        if (result.BooleanValue)
+            _materialized.Remove(key);
+        return result;
     }
 
     /// <inheritdoc />
@@ -197,14 +197,19 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// handler's. A handler that declines has cost one virtual call on an object that had none.
     /// </para>
     /// <para>
-    /// <b><c>Delete(uint)</c> is deliberately NOT overridden.</b> The engine routes a digit-only key
-    /// there instead of here, and the other provider's engine routes it away from the named hook
-    /// too. Answering it on one side alone would make <c>delete storage[7]</c> remove an item under
-    /// one engine and not the other, which is worse than the gap both share.
+    /// Indexed deletion updates slot ownership but never calls the named deletion hook. A handler
+    /// entry still inside the dense range is supplied again on the next lookup; deleting an ordinary
+    /// indexed override exposes that handler entry.
     /// </para>
     /// </remarks>
     public override JSValue Delete(in KeyString key)
     {
+        // Host DeleteProperty supplies a KeyString even for a numeric name. Use the indexed
+        // storage path, just as a guest numeric deletion does, without invoking the named hook.
+        var metadata = key.Metadata;
+        if (metadata.IsArrayIndex)
+            return Delete(metadata.ArrayIndex);
+
         _deleter?.TryDeleteNamed(key.ToString());
 
         return base.Delete(in key);

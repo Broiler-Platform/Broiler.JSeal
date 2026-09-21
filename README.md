@@ -33,17 +33,18 @@ document or execution realm is a runtime registration rather than a compile-time
   ┌───────────▼──────────────┐                    ┌───────────────▼──────────────┐
   │ Broiler.JSeal.BroilerJs  │                    │ Broiler.JSeal.Vm             │
   │   over Broiler.JS        │                    │   over Broiler.VM profile    │
-  │   reference engine       │                    │   conditional / -VM builds   │
+  │   broiler-js             │                    │   broiler-vm                 │
   └──────────────────────────┘                    └──────────────────────────────┘
 ```
 
-**`Broiler.JSeal` has no `ProjectReference` and no `PackageReference`.** Engine neutrality is asserted
-by the compiler: an assembly that references nothing cannot name a `Broiler.JavaScript` type, a
-`Broiler.VM` type, or anything either drags in.
+**`Broiler.JSeal` declares no `ProjectReference` or `PackageReference`.** With those dependencies,
+the compiler cannot resolve either engine's types in the contracts project. There is no dedicated
+CI check preventing a future reference from being added; the current boundary is described in the
+[architecture guide](docs/jseal.md#projects-and-dependency-boundaries).
 
 ## The Value Model
 
-`JsValue` is a 24-byte `readonly struct` consisting of a kind tag (`JsValueKind`), a `double` for
+`JsValue` is a `readonly struct` (24 bytes on measured x64 builds) consisting of a kind tag (`JsValueKind`), a `double` for
 numeric representation, and an `object?` reference for engine-managed objects or strings.
 
 - **Missing vs Undefined**: `JsValue.Missing` has kind 0, allowing hosts to distinguish absent
@@ -56,33 +57,42 @@ numeric representation, and an `object?` reference for engine-managed objects or
 
 ## Continuous Integration and Publishing
 
-Every push and pull request builds all libraries on Linux and Windows under both `Release` and
-`Release-VM` configurations, runs the conformance test suite against all registered providers, and
-packs NuGet packages to ensure packaging validity.
+Pushes to main and pull requests build all libraries on Linux and Windows under both `Release` and
+`Release-VM` configurations, run the conformance test suite against all registered providers, and
+run isolated package consumers. The Windows job also packs and verifies the NuGet packages.
 
 Publishing supports GitHub Packages and NuGet.org with automated preview versioning.
 
 ## Build and Test
 
 ```bash
-# Build Release (Broiler.JS provider + contracts)
+# Build all libraries; Release tests reference the JS provider
 dotnet build Broiler.JSeal.slnx -c Release
 
 # Run tests under Release
 dotnet test Broiler.JSeal.slnx -c Release
 
-# Build Release-VM (includes Broiler.VM provider)
+# Build all libraries; Release-VM tests reference both providers
 dotnet build Broiler.JSeal.slnx -c Release-VM
 
 # Run tests under Release-VM (exercises both engines in the conformance suite)
 dotnet test Broiler.JSeal.slnx -c Release-VM
+
+# Pack and test each provider as a standalone NuGet consumer (PowerShell 7+)
+pwsh -NoProfile -File eng/test-package-consumer.ps1
 ```
+
+The [package-consumer check](eng/package-consumer/README.md) restores from an isolated local feed
+into fresh caches and runs outside the source tree. CI includes it on Windows and Linux.
 
 ## Documentation
 
 - [JSEAL Specification](docs/jseal.md) — Detailed architecture, realm contracts, capabilities, and provider guide
 - [Roadmap](docs/roadmap.md) — Release milestones and status
-- [Human Review Record](HUMAN_REVIEW.md) — Preview review scope and security attestation
+- [Human Review Record](HUMAN_REVIEW.md) — Review scope; human approval remains pending
+
+Validate local documentation links and project examples with `python diagnostics/J14/check_docs.py`.
+This optional check uses Python 3.9+ and ripgrep; it does not run behavioral tests or fetch URLs.
 
 ## License
 

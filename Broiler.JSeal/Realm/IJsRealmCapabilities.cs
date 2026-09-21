@@ -2,34 +2,12 @@
 
 namespace Broiler.JSeal;
 
-// The realm surface is split into six narrow capability contracts, the way IScriptEngine was split in
-// this repository's Phase 8. IJsRealm (see IJsRealm.cs) aggregates them, and every binding depends on
-// the aggregate, so nothing at a call site gets longer. The split exists for the other two readers:
-// a provider, which implements them one at a time and can say in its own source which group a file
-// serves; and a reviewer asking what an engine must be able to do, who gets six answerable questions
-// instead of one surface of forty members.
+// IJsRealm aggregates these operation interfaces; providers implement each over their engine.
 
-/// <summary>
-/// Creating values, and the conversions between a JavaScript value and a CLR one that a handle cannot
-/// perform for itself.
-/// </summary>
+/// <summary>Create realm values and perform conversions requiring a provider.</summary>
 /// <remarks>
-/// <para>
-/// The cheap conversions are not here â€” they are on <see cref="JsValue"/> itself
-/// (<see cref="JsValue.AsBoolean"/>, <see cref="JsValue.AsNumber"/>, <see cref="JsValue.AsString"/>),
-/// because a host that has to enter the engine to ask whether a value is truthy will do it on every
-/// branch of every callback.
-/// </para>
-/// <para>
-/// <b>What is here is what the handle cannot answer, and that is two reasons rather than one.</b>
-/// This paragraph used to call the cheap conversions "decidable from the handle" and the members here
-/// "the set that can run user code". <see cref="ToJsString"/> and <see cref="ToNumber"/> are here for
-/// that reason: <c>ToString</c> on an object may call a <c>toString</c> the page wrote.
-/// <see cref="ToBoolean"/> is not, because ECMAScript's ToBoolean calls nothing for any value. It is
-/// here because truthiness is NOT decidable from the handle for every kind: a
-/// <see cref="JsValueKind.BigInt"/> is carried as an opaque provider reference, so whether it is zero
-/// is a question only code entitled to name the engine's value can ask.
-/// </para>
+/// JsValue exposes cheap handle inspections. ToJsString and ToNumber may execute guest coercion;
+/// ToBoolean needs the provider for opaque BigInt truthiness but does not execute guest code.
 /// </remarks>
 public interface IJsValues
 {
@@ -169,7 +147,7 @@ public interface IJsMembers
 
     /// <summary>
     /// Installs an accessor property. A <see langword="null"/> <paramref name="setter"/> makes it
-    /// read-only, which is how the bridge expresses a read-only IDL attribute (216 sites on 2026-09-08).
+    /// read-only, which is how the bridge expresses a read-only IDL attribute.
     /// </summary>
     void DefineAccessor(JsValue target, string name, JsNativeFunction getter, JsNativeFunction? setter, JsPropertyFlags flags = JsPropertyFlags.Default);
 
@@ -268,95 +246,35 @@ public interface IJsJobs
     /// (<c>customElements.whenDefined</c>) captures the resolve function out of the executor and
     /// stores it, which only works because Broiler.JS happens to run the executor synchronously.
     /// Depending on that is depending on an engine's scheduling; returning the pair does not.
+    /// Both delegates require a live realm: after disposal they throw
+    /// <see cref="ObjectDisposedException"/>, even if the promise has already settled, without
+    /// reading thenable properties or scheduling reactions. The host must serialize their use
+    /// with other realm operations, including disposal.
     /// </remarks>
     JsValue NewPromise(out Action<JsValue> resolve, out Action<JsValue> reject);
 }
 
-/// <summary>
-/// Turning JavaScript source into something that runs â€” and the distinction between the three
-/// different reasons a browser does that.
-/// </summary>
+/// <summary>Separate host-authorized, classic and dynamic source evaluation.</summary>
 /// <remarks>
-/// <para>
-/// <b>THE AXIS IS WHICH CONTENT-SECURITY-POLICY DIRECTIVE GOVERNS THE SOURCE, NOT WHOSE TEXT IT IS.</b>
-/// That is the correction this interface's three members exist to carry, and it was learned the hard
-/// way: two call sites in the bridge reached opposite conclusions about the same kind of text, one
-/// arguing from the directive and one from provenance, and each was half right. A script element is
-/// governed by <c>script-src</c> â€” per script, satisfied by <c>'unsafe-inline'</c>, a matching nonce
-/// or a matching hash. <c>eval</c> and <c>new Function</c> are governed by <c>'unsafe-eval'</c> â€” per
-/// realm. Those are different decisions, taken by different code, at different times. A page served
-/// <c>script-src 'unsafe-inline'</c> runs every one of its script elements and no <c>eval</c>; a page
-/// served <c>script-src 'nonce-x' 'unsafe-eval'</c> is the other way round. A contract with one
-/// member for both cannot express either page, which is why there are three.
-/// </para>
-/// <para>
-/// <b>Host script is not the page's source, and conflating the two is what makes a second engine
-/// look impossible.</b> The bridge itself authors JavaScript, and <c>EvaluateHostScript</c> runs it
-/// throughout <c>Broiler.HtmlBridge.Dom</c>: two calls run the embedded <c>.js</c> assets, 1,891
-/// lines between them, and most of the rest install a polyfill or an interface object, or probe for
-/// a global. That source is written by this repository, ships with it, and is not subject to the
-/// page's Content-Security-Policy. A dynamic <c>import()</c> is none of the three members: it is
-/// <see cref="JsCapabilities.DynamicImport"/>, and <see cref="JsCapabilities.GuestEval"/> does not
-/// gate it.
-/// </para>
-/// <para>
-/// An engine with no run-time compiler could support host script by compiling the bridge's own
-/// JavaScript when the engine is built, and lack the other two, because a page's text is not
-/// knowable then. Declaring them separately is what lets a provider say so.
-/// <c>VmEngineProvider</c> is not that engine: all three members compile at run time, through the
-/// artifact provider it registers for every realm, and a forbidden <c>eval</c> is refused inside
-/// that provider rather than by registering none. (This used to say Broiler.VM refuses by
-/// registering no artifact provider; that is <c>VmScriptEngine</c>'s shape, not this provider's.)
-/// </para>
+/// EvaluateHostScript runs trusted host-authored code. The host authorizes each classic script before
+/// calling EvaluateClassicScript. EvaluateDynamicSource requires GuestEval, and providers also block
+/// guest eval and Function compilation when that capability is absent. Host/classic evaluation does
+/// not exempt guest callbacks from this restriction. None of these methods executes module graphs.
 /// </remarks>
 public interface IJsSource
 {
-    /// <summary>
-    /// Runs JavaScript this repository authored. Not subject to the page's content policy.
-    /// </summary>
-    /// <param name="source">The script text.</param>
+    /// <summary>Evaluate trusted host-authored source; ForceStrictMode applies here.</summary>
+    /// <param name="source">JavaScript supplied by the host.</param>
     /// <param name="label">
-    /// A name for the evaluation â€” <c>polyfill:streams</c>, <c>probe:global-this</c>. Broiler.JS
-    /// compiles it as the script's file path, which stack frames report and its code cache keys on;
-    /// Broiler.VM names it only in the error thrown when the realm has no <c>eval</c> intrinsic.
+    /// Diagnostic label. Broiler.JS passes it to Eval; VM currently uses a fixed compiler unit name.
+    /// Consistent source identity is tracked by roadmap slice J17.
     /// </param>
     JsValue EvaluateHostScript(string source, string label);
 
-    /// <summary>
-    /// Runs a CLASSIC SCRIPT the page carries â€” a script element's text, a sub-document's, a worker's
-    /// top-level script, an <c>importScripts</c> body, the wrapper compiled from an event-handler
-    /// content attribute.
-    /// </summary>
+    /// <summary>Evaluate a classic script after the host has authorized it.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>"Classic script" is the specification's term and it is chosen for what it EXCLUDES.</b> Its
-    /// definition does not cover <c>eval</c> or <c>new Function</c>, so an implementer reading the
-    /// name alone cannot route those here. <c>EvaluatePageScript</c> was considered and rejected: "the
-    /// page's source" is equally true of the text handed to <c>eval</c>, which is the exact confusion
-    /// these three members exist to remove.
-    /// </para>
-    /// <para>
-    /// <b>THE CALLER HAS ALREADY TAKEN THE <c>script-src</c> DECISION, AND THIS CONTRACT CANNOT CHECK
-    /// THAT IT DID.</b> Stated as an obligation because it cannot be made a parameter:
-    /// <c>Broiler.JSeal</c> has no <c>ProjectReference</c> and no <c>PackageReference</c>
-    /// at all â€” its engine-neutrality is a compiler outcome rather than a convention â€” so it cannot
-    /// name a policy type; and the decision is per script and content-dependent, so it could not be a
-    /// realm-shaped option even if the type were reachable. A token minted by the policy layer was
-    /// considered and rejected: anything that can call the minter can forge one, so it buys ceremony
-    /// rather than enforcement.
-    /// </para>
-    /// <para>
-    /// <b>The worker path does not meet that obligation today.</b> <c>JSWorker</c> hands over a
-    /// worker's top-level script and each <c>importScripts</c> body with no
-    /// Content-Security-Policy consulted, and a worker's top-level script is governed by
-    /// <c>worker-src</c>, which falls back through <c>child-src</c> and <c>script-src</c> to
-    /// <c>default-src</c>; this repository's policy parser reads neither of the first two.
-    /// </para>
-    /// <para>
-    /// Throws when the realm was not built with <see cref="JsCapabilities.ClassicScriptSource"/>.
-    /// That is an ABILITY and not a permission: it says the engine can compile text it did not see
-    /// when it was built, which an ahead-of-time engine may honestly lack.
-    /// </para>
+    /// ClassicScriptSource describes ability to run supplied script text, independently of GuestEval.
+    /// The host applies its per-script policy before calling. ForceStrictMode does not affect this member.
     /// </remarks>
     JsValue EvaluateClassicScript(string source, string label);
 

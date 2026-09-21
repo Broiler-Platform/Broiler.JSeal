@@ -20,14 +20,7 @@
     <ProjectReference Include="..\Broiler.JSeal.BroilerJs\Broiler.JSeal.BroilerJs.csproj" />
   </ItemGroup>
 
-  <!--
-    THE VM SIDE IS CONDITIONAL, AND THE CONDITION IS THE POINT.
-
-    The conformance suite itself names no engine type — that is what makes it a conformance
-    suite — so it cannot be the thing that registers a provider. Registration happens in
-    Jseal/VmProviderRegistration.cs, which is compiled only under the configurations that
-    link Broiler.VM.
-  -->
+  <!-- VM configurations add the VM reference and its explicit test-discovery registration. -->
   <ItemGroup Condition="'$(BroilerJavaScriptEngine)' == 'Vm'">
     <ProjectReference Include="..\Broiler.JSeal.Vm\Broiler.JSeal.Vm.csproj" />
   </ItemGroup>

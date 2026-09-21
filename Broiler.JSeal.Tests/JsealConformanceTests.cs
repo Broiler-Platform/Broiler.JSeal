@@ -7,35 +7,20 @@ using Broiler.JSeal;
 namespace Broiler.JSeal.Tests;
 
 /// <summary>
-/// What "a correct JSEAL provider" means, asserted against the contracts and nothing else.
-/// <para>
-/// Every test here is a <see cref="TheoryAttribute"/> over <see cref="Engines"/>, which is
-/// <see cref="JsEngineRegistry.All"/>. Today that is one provider and the suite reads as an
-/// ordinary test class; the reason it is shaped this way is the second one. Adding an engine adds
-/// a registration and no test code, and the definition of done for that engine is already written
-/// down here â€” which is the thing a conformance suite buys and a per-engine test class does not.
-/// </para>
-/// <para>
-/// <b>Nothing in this suite names an engine type.</b> The assertions are all on JSEAL contracts, so
-/// a provider that passes has demonstrated the behaviour the DOM bridge binds against rather than
-/// the behaviour its own engine happens to have. Where a contract leaves an outcome open â€” what an
-/// assignment to a setter-less accessor does, what order an exotic object enumerates in â€” the test
-/// pins what the provider actually does and says so in a comment, because an unpinned outcome is
-/// one a second provider would be free to differ on silently.
-/// </para>
+/// Tests shared JSEAL behavior through the public contracts. Provider theories use
+/// <see cref="Engines"/>; handle-only and coverage checks run as facts.
 /// </summary>
+/// <remarks>
+/// Release registers Broiler.JS. Release-VM also registers Broiler.VM. Provider registration is
+/// explicit setup; behavioral assertions use JSEAL values and realms. Engine-specific adoption
+/// checks live separately in BroilerJsLifetimeTests.
+/// </remarks>
 public partial class JsealConformanceTests
 {
-    /// <summary>
-    /// Registration is explicit rather than left to assembly load.
-    /// </summary>
+    /// <summary>Register Broiler.JS before discovering provider theory data.</summary>
     /// <remarks>
-    /// A provider registers itself from a <c>[ModuleInitializer]</c>, which the CLR runs when the
-    /// assembly is first loaded â€” and it loads an assembly when a type in it is first touched. This
-    /// suite touches no engine type at all, by design, so nothing here would drag the provider
-    /// assembly in and <see cref="Engines"/> could enumerate an empty registry. Naming
-    /// <see cref="JsEngineHosting"/> â€” the host wiring step, which references every provider this
-    /// build linked â€” is what makes the reference real. It is idempotent.
+    /// Module initializers run only after an assembly loads. Explicit registration ensures this
+    /// provider is available at discovery time; VmProviderRegistration adds the VM in VM builds.
     /// </remarks>
     static JsealConformanceTests() => BroilerJsEngineProvider.Register();
 
@@ -59,27 +44,11 @@ public partial class JsealConformanceTests
     }
 
 #if BROILER_VM_JS
-    /// <summary>
-    /// A build that links Broiler.VM runs every theory in this suite against its provider too.
-    /// </summary>
+    /// <summary>VM configurations must discover both real providers.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>This is the assertion <c>Jseal/VmProviderRegistration.cs</c> exists for and did not
-    /// make.</b> That file names <c>VmJsealHosting</c> from a module initializer so the VM provider
-    /// is in the registry when <see cref="Engines"/> enumerates it, and its own remarks name the
-    /// failure it prevents â€” "not a red test, but a green one that never ran". Nothing checked that
-    /// it worked. If the module initializer stopped running, or the conditional <c>Compile</c> item
-    /// stopped matching, every theory here would keep passing while testing half of what this build
-    /// contains, and the suite would report the same green it reports now.
-    /// </para>
-    /// <para>
-    /// <b>Membership, and deliberately not the default or the count.</b>
-    /// <c>JsealRegistryTests</c> registers and unregisters providers of its own and moves
-    /// <c>JsEngineRegistry.Default</c> aside and back; xUnit runs test classes in parallel, so a
-    /// count or a default read here would be a flake waiting for a slow machine. The two real
-    /// providers are never unregistered, so asking whether each is present is the strongest claim
-    /// that is also stable.
-    /// </para>
+    /// Jseal/VmProviderRegistration.cs registers both providers from a module initializer. This check
+    /// detects a missing conditional reference or registration that would silently omit VM theories.
+    /// Registry mutation tests use isolated state and do not change the discovery registry.
     /// </remarks>
     [Fact]
     public void AVmBuildHasBothProvidersRegistered()

@@ -2,23 +2,10 @@
 
 namespace Broiler.JSeal.BroilerJs;
 
-/// <summary>
-/// Broiler.JS, as something the browser can choose.
-/// </summary>
+/// <summary>The Broiler.JS implementation of the JSEAL realm contracts.</summary>
 /// <remarks>
-/// <para>
-/// <b>Registration happens because the assembly is linked, not because a host remembered to ask.</b>
-/// <see cref="JsEngineRegistry"/> decides among the providers that are present and the build decides
-/// which are present, so the moment the two must agree is assembly load â€” which is exactly what a
-/// <see cref="ModuleInitializerAttribute"/> names. A host wiring step in its place would be a second
-/// place for "which engine is linked" to be recorded, and the one that is a comment in a csproj
-/// rather than a reference would drift.
-/// </para>
-/// <para>
-/// <see cref="Register"/> is public anyway, for the host that needs the registration to have happened
-/// by a particular point â€” a test that calls <see cref="JsEngineRegistry.Reset"/> and has to put the
-/// process back, most of all, since a module initializer runs once and will not run again for it.
-/// </para>
+/// The module initializer registers on assembly load. Hosts can call Register explicitly to ensure
+/// registration before choosing an engine or to restore it after clearing their registry.
 /// </remarks>
 public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoption
 {
@@ -28,30 +15,12 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// <inheritdoc />
     public string Description => "Broiler.JS â€” the from-scratch C# ECMAScript engine (Broiler.JavaScript).";
 
-    /// <summary>
-    /// A host's answer to whether this engine binds ES modules end to end, when the host has paid to
-    /// find out. <see langword="null"/> â€” the default â€” means the question has not been asked, and
-    /// the module capabilities are then reported absent.
-    /// </summary>
+    /// <summary>Optional host evidence for static and dynamic module support.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>Why the provider cannot simply assert Modules and DynamicImport.</b> Whether a static
-    /// import binds its value is not a fact about Broiler.JS the engine; it is a fact about the
-    /// checkout â€” it became true only with submodule patches 0010 (top-level-await codegen) and 0011
-    /// (module-orchestration completion), and this provider compiles unchanged against a submodule
-    /// without them. Worse, the failure is not a refusal: on an unpatched engine the import resolves
-    /// to <c>undefined</c>, or the module body never completes, which is why
-    /// <c>Broiler.HtmlBridge.Dom/EngineModuleSupport.cs</c> probes on a worker thread behind a
-    /// five-second timeout and treats a hang as "not supported".
-    /// </para>
-    /// <para>
-    /// A capability is a claim a host is entitled to branch on without paying to verify it, so
-    /// asserting one whose truth costs a five-second timeout to establish would make the declaration
-    /// worth less than the probe it replaced. The provider therefore declares what it can always
-    /// honour and lets the host that already ran the probe publish the result here â€” one line,
-    /// <c>BroilerJsEngineProvider.ModuleSupport = () =&gt; EngineModuleSupport.Available;</c> â€” so the
-    /// answer reaches the contract without the contract having to go and get it.
-    /// </para>
+    /// Null, false or a throwing callback leaves Modules and DynamicImport absent. A true result advertises
+    /// both flags. JSEAL has no module-loader or module-evaluation contract; hosts using these flags must
+    /// provide and validate their own integration. Referencing the Modules package alone is not evidence
+    /// of module execution through JSEAL; that package also supplies ordinary arguments-object support.
     /// </remarks>
     public static Func<bool>? ModuleSupport { get; set; }
 

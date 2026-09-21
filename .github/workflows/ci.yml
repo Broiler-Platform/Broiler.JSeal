@@ -78,6 +78,18 @@ jobs:
       - name: Test (Release-VM)
         run: bash ./eng/run-tests.sh Release-VM
 
+      - name: Test isolated package consumers
+        shell: pwsh
+        run: ./eng/test-package-consumer.ps1 -Version $env:PACKAGE_VERSION
+
+      - name: Upload package-consumer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-consumers-${{ matrix.os }}
+          path: test-results/package-consumer/
+          if-no-files-found: warn
+
       - name: Pack and verify every package
         if: matrix.os == 'windows-latest'
         shell: pwsh

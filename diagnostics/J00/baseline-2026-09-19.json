@@ -1,0 +1,1628 @@
+{
+  "schemaVersion": 1,
+  "purpose": "J00 targeted review observations; not a conformance score",
+  "capturedUtc": "2026-09-19T16:23:15.4291613Z",
+  "mode": "All",
+  "os": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "powerShell": "7.6.5",
+  "completed": true,
+  "repositories": {
+    "jseal": {
+      "revision": "d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+      "workingTree": [
+        " M docs/roadmap.md",
+        "?? diagnostics/",
+        "?? docs/roadmap.integration.md",
+        "?? docs/roadmap.jseal.md",
+        "?? docs/roadmap.vm-features.md",
+        "?? docs/roadmap.vm-semantics.md"
+      ]
+    },
+    "broilerJs": {
+      "revision": "73f071d1f1e1d5404018bc5337d6dafc74011676",
+      "workingTree": []
+    },
+    "broilerVm": {
+      "revision": "405fe2d234bbae69b1ea70dac603bbfe24978760",
+      "workingTree": []
+    }
+  },
+  "inputHashes": [
+    {
+      "path": "<JSeal>/diagnostics/J00/run.ps1",
+      "sha256": "3ec43440c8b6b96d795682e700a8f8817858086a1b61f9fffd89375fbed064e7"
+    },
+    {
+      "path": "<JSeal>/diagnostics/J00/language.js",
+      "sha256": "b8c09675c045b57e8e57f4cde7c3742c0d035b0b7968edd287415bc85b2ebef1"
+    },
+    {
+      "path": "<JSeal>/diagnostics/J00/ProviderProbes/Program.cs",
+      "sha256": "483dccbe19a9f083126070ee211b26576fa825a97613b7a5e46e01c2d02e4c23"
+    },
+    {
+      "path": "<JSeal>/diagnostics/J00/ProviderProbes/ProviderProbes.csproj",
+      "sha256": "cbb2b6a854843dcccc8478f084116f0278c87a38c5b2d9ce625779ea16a77b6a"
+    },
+    {
+      "path": "<JSeal>/Directory.Packages.props",
+      "sha256": "9ded10f1d7a0a07a29b6d69f941d7727fefa00f083d6b760c6eb18b2a26201b0"
+    }
+  ],
+  "commands": [
+    {
+      "name": "jseal-revision",
+      "executable": "git",
+      "arguments": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "jseal-revision.stdout.txt",
+      "stderrLog": "jseal-revision.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f\n",
+      "stderr": ""
+    },
+    {
+      "name": "jseal-status",
+      "executable": "git",
+      "arguments": [
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=normal"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "jseal-status.stdout.txt",
+      "stderrLog": "jseal-status.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": " M docs/roadmap.md\n?? diagnostics/\n?? docs/roadmap.integration.md\n?? docs/roadmap.jseal.md\n?? docs/roadmap.vm-features.md\n?? docs/roadmap.vm-semantics.md\n",
+      "stderr": ""
+    },
+    {
+      "name": "dotnet-sdk",
+      "executable": "dotnet",
+      "arguments": [
+        "--version"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "dotnet-sdk.stdout.txt",
+      "stderrLog": "dotnet-sdk.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "10.0.401\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "build-providers",
+      "executable": "dotnet",
+      "arguments": [
+        "build",
+        "<JSeal>/diagnostics/J00/ProviderProbes/ProviderProbes.csproj",
+        "-c",
+        "Release-VM",
+        "--nologo"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 300,
+      "stdoutLog": "build-providers.stdout.txt",
+      "stderrLog": "build-providers.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "  Wiederherzustellende Projekte werden ermittelt...\r\n  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.\r\n  Broiler.JSeal -> <JSeal>\\Broiler.JSeal\\bin\\Release-VM\\net10.0\\Broiler.JSeal.dll\r\n  Broiler.JSeal.BroilerJs -> <JSeal>\\Broiler.JSeal.BroilerJs\\bin\\Release-VM\\net10.0\\Broiler.JSeal.BroilerJs.dll\r\n  Broiler.JSeal.Vm -> <JSeal>\\Broiler.JSeal.Vm\\bin\\Release-VM\\net10.0\\Broiler.JSeal.Vm.dll\r\n  ProviderProbes -> <JSeal>\\diagnostics\\J00\\ProviderProbes\\bin\\Release-VM\\net10.0\\ProviderProbes.dll\r\n\r\nDer Buildvorgang wurde erfolgreich ausgeführt.\r\n    0 Warnung(en)\r\n    0 Fehler\r\n\r\nVerstrichene Zeit 00:00:01.13\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "provider-js",
+      "executable": "dotnet",
+      "arguments": [
+        "<JSeal>/diagnostics/J00/ProviderProbes/bin/Release-VM/net10.0/ProviderProbes.dll",
+        "broiler-js"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 30,
+      "stdoutLog": "provider-js.stdout.txt",
+      "stderrLog": "provider-js.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "J00\t{\"id\":\"J03.arguments\",\"expected\":\"7\",\"actual\":\"throw:System.InvalidOperationException\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":\"JSArgumentsBuilder is not initialized. Ensure the Broiler.JavaScript.Modules assembly is available.\"}\r\nJ00\t{\"id\":\"J04.eval-permissive-control\",\"expected\":\"42\",\"actual\":\"42\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J04.eval-restricted\",\"expected\":\"SyntaxError\",\"actual\":\"SyntaxError\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J05.callable-proxy\",\"expected\":\"Function;result=42\",\"actual\":\"Object;result=42\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J06.getter-exception\",\"expected\":\"JsEngineException;thrown=42\",\"actual\":\"throw:Broiler.JavaScript.Runtime.JSException\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":\"42\"}\r\nJ00\t{\"id\":\"J07.coercion-exception\",\"expected\":\"JsEngineException;thrown=42\",\"actual\":\"throw:Broiler.JavaScript.Runtime.JSException\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":\"42\"}\r\nJ00\t{\"id\":\"J08.undefined-precedence\",\"expected\":\"Undefined\",\"actual\":\"String\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"inventory.Array.fromAsync\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"inventory.Object.groupBy\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"inventory.Map.groupBy\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00-DONE\t10\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "provider-vm",
+      "executable": "dotnet",
+      "arguments": [
+        "<JSeal>/diagnostics/J00/ProviderProbes/bin/Release-VM/net10.0/ProviderProbes.dll",
+        "broiler-vm"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 30,
+      "stdoutLog": "provider-vm.stdout.txt",
+      "stderrLog": "provider-vm.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "J00\t{\"id\":\"J03.arguments\",\"expected\":\"7\",\"actual\":\"7\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J04.eval-permissive-control\",\"expected\":\"42\",\"actual\":\"42\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J04.eval-restricted\",\"expected\":\"SyntaxError\",\"actual\":\"42\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J05.callable-proxy\",\"expected\":\"Function;result=42\",\"actual\":\"Function;result=42\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J06.getter-exception\",\"expected\":\"JsEngineException;thrown=42\",\"actual\":\"JsEngineException;thrown=42\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J07.coercion-exception\",\"expected\":\"JsEngineException;thrown=42\",\"actual\":\"JsEngineException;thrown=42\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"J08.undefined-precedence\",\"expected\":\"Undefined\",\"actual\":\"Undefined\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"inventory.Array.fromAsync\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"inventory.Object.groupBy\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00\t{\"id\":\"inventory.Map.groupBy\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\",\"exceptionMessage\":null}\r\nJ00-DONE\t10\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "registry",
+      "executable": "dotnet",
+      "arguments": [
+        "<JSeal>/diagnostics/J00/ProviderProbes/bin/Release-VM/net10.0/ProviderProbes.dll",
+        "registry"
+      ],
+      "workingDirectory": "<JSeal>",
+      "timeoutSeconds": 30,
+      "stdoutLog": "registry.stdout.txt",
+      "stderrLog": "registry.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "J00\t{\"id\":\"J10.default-after-removal\",\"expected\":\"broiler-vm\",\"actual\":\"default-unavailable;HasAny=True\",\"outcome\":\"differs-from-target\",\"exceptionMessage\":null}\r\nJ00-DONE\t1\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "js-revision",
+      "executable": "git",
+      "arguments": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "workingDirectory": "<Broiler.JS>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "js-revision.stdout.txt",
+      "stderrLog": "js-revision.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "73f071d1f1e1d5404018bc5337d6dafc74011676\n",
+      "stderr": ""
+    },
+    {
+      "name": "js-status",
+      "executable": "git",
+      "arguments": [
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=normal"
+      ],
+      "workingDirectory": "<Broiler.JS>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "js-status.stdout.txt",
+      "stderrLog": "js-status.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "vm-revision",
+      "executable": "git",
+      "arguments": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "workingDirectory": "<Broiler.VM>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "vm-revision.stdout.txt",
+      "stderrLog": "vm-revision.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "405fe2d234bbae69b1ea70dac603bbfe24978760\n",
+      "stderr": ""
+    },
+    {
+      "name": "vm-status",
+      "executable": "git",
+      "arguments": [
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=normal"
+      ],
+      "workingDirectory": "<Broiler.VM>",
+      "timeoutSeconds": 10,
+      "stdoutLog": "vm-status.stdout.txt",
+      "stderrLog": "vm-status.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "build-source-js",
+      "executable": "dotnet",
+      "arguments": [
+        "build",
+        "<Broiler.JS>/Broiler.JS/Broiler.JavaScript/Broiler.JavaScript.csproj",
+        "-c",
+        "Release",
+        "--nologo"
+      ],
+      "workingDirectory": "<Broiler.JS>",
+      "timeoutSeconds": 300,
+      "stdoutLog": "build-source-js.stdout.txt",
+      "stderrLog": "build-source-js.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "  Wiederherzustellende Projekte werden ermittelt...\r\n  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.\r\n  Broiler.JavaScript.Expressions -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Expressions\\bin\\Release\\net10.0\\Broiler.JavaScript.Expressions.dll\r\n  Broiler.JavaScript.ExpressionCompiler -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.ExpressionCompiler\\bin\\Release\\net10.0\\Broiler.JavaScript.ExpressionCompiler.dll\r\n  Broiler.JavaScript.Ast -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Ast\\bin\\Release\\net10.0\\Broiler.JavaScript.Ast.dll\r\n  Broiler.JavaScript.Storage -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Storage\\bin\\Release\\net10.0\\Broiler.JavaScript.Storage.dll\r\n  Broiler.JavaScript.JSClassGenerator -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.JSClassGenerator\\bin\\Release\\netstandard2.0\\Broiler.JavaScript.JSClassGenerator.dll\r\n  Broiler.JavaScript.Runtime -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Runtime\\bin\\Release\\net10.0\\Broiler.JavaScript.Runtime.dll\r\n  Broiler.JavaScript.Parser -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Parser\\bin\\Release\\net10.0\\Broiler.JavaScript.Parser.dll\r\n  Broiler.JavaScript.Engine -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Engine\\bin\\Release\\net10.0\\Broiler.JavaScript.Engine.dll\r\n  Broiler.JavaScript.LinqExpressions -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.LinqExpressions\\bin\\Release\\net10.0\\Broiler.JavaScript.LinqExpressions.dll\r\n  Broiler.JavaScript.Compiler -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Compiler\\bin\\Release\\net10.0\\Broiler.JavaScript.Compiler.dll\r\n  Broiler.JavaScript.Extensions -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Extensions\\bin\\Release\\net10.0\\Broiler.JavaScript.Extensions.dll\r\n  Broiler.JavaScript.BuiltIns -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.BuiltIns\\bin\\Release\\net10.0\\Broiler.JavaScript.BuiltIns.dll\r\n  Broiler.JavaScript.Modules -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Modules\\bin\\Release\\net10.0\\Broiler.JavaScript.Modules.dll\r\n  Broiler.JavaScript.Globals -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Globals\\bin\\Release\\net10.0\\Broiler.JavaScript.Globals.dll\r\n  Broiler.JavaScript.Clr -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript.Clr\\bin\\Release\\net10.0\\Broiler.JavaScript.Clr.dll\r\n  Broiler.JavaScript -> <Broiler.JS>\\Broiler.JS\\Broiler.JavaScript\\bin\\Release\\net10.0\\BroilerJS.dll\r\n\r\nDer Buildvorgang wurde erfolgreich ausgeführt.\r\n    0 Warnung(en)\r\n    0 Fehler\r\n\r\nVerstrichene Zeit 00:00:02.46\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "build-source-vm",
+      "executable": "dotnet",
+      "arguments": [
+        "build",
+        "<Broiler.VM>/src/compositions/Broiler.VM.Composition.JavaScript.Cli/Broiler.VM.Composition.JavaScript.Cli.csproj",
+        "-c",
+        "Release",
+        "--nologo"
+      ],
+      "workingDirectory": "<Broiler.VM>",
+      "timeoutSeconds": 300,
+      "stdoutLog": "build-source-vm.stdout.txt",
+      "stderrLog": "build-source-vm.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "  Wiederherzustellende Projekte werden ermittelt...\r\n  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.\r\n  Broiler.VM.Abstractions -> <Broiler.VM>\\src\\Broiler.VM.Abstractions\\bin\\Release\\net10.0\\Broiler.VM.Abstractions.dll\r\n  Broiler.VM.Binary -> <Broiler.VM>\\src\\Broiler.VM.Binary\\bin\\Release\\net10.0\\Broiler.VM.Binary.dll\r\n  Broiler.VM.Profile.JavaScript.Format -> <Broiler.VM>\\src\\Broiler.VM.Profile.JavaScript.Format\\bin\\Release\\net10.0\\Broiler.VM.Profile.JavaScript.Format.dll\r\n  Broiler.VM.Profile.JavaScript -> <Broiler.VM>\\src\\Broiler.VM.Profile.JavaScript\\bin\\Release\\net10.0\\Broiler.VM.Profile.JavaScript.dll\r\n  Broiler.VM.Runtime -> <Broiler.VM>\\src\\Broiler.VM.Runtime\\bin\\Release\\net10.0\\Broiler.VM.Runtime.dll\r\n  Broiler.VM.Profile.JavaScript.Compiler -> <Broiler.VM>\\src\\Broiler.VM.Profile.JavaScript.Compiler\\bin\\Release\\net10.0\\Broiler.VM.Profile.JavaScript.Compiler.dll\r\n  Broiler.VM.Composition.JavaScript.Cli -> <Broiler.VM>\\src\\compositions\\Broiler.VM.Composition.JavaScript.Cli\\bin\\Release\\net10.0\\Broiler.VM.Composition.JavaScript.Cli.dll\r\n\r\nDer Buildvorgang wurde erfolgreich ausgeführt.\r\n    0 Warnung(en)\r\n    0 Fehler\r\n\r\nVerstrichene Zeit 00:00:01.42\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "source-js",
+      "executable": "dotnet",
+      "arguments": [
+        "<Broiler.JS>/Broiler.JS/Broiler.JavaScript/bin/Release/net10.0/BroilerJS.dll",
+        "--script-host",
+        "<JSeal>/diagnostics/J00/language.js"
+      ],
+      "workingDirectory": "<Broiler.JS>",
+      "timeoutSeconds": 30,
+      "stdoutLog": "source-js.stdout.txt",
+      "stderrLog": "source-js.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "J00\t{\"id\":\"V07.array-species\",\"expected\":\"true\",\"actual\":\"true\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"V09.concat-spreadable\",\"expected\":\"a\",\"actual\":\"a\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"V04.regexp-guard\",\"expected\":\"throw:TypeError\",\"actual\":\"throw:TypeError\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"V01.numeric-coercion-order\",\"expected\":\"ab\",\"actual\":\"ab\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"V02.frozen-symbol\",\"expected\":\"0\",\"actual\":\"0\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"V05.mapped-arguments\",\"expected\":\"7\",\"actual\":\"7\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"V14.direct-eval\",\"expected\":\"7\",\"actual\":\"7\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"F08.normalization\",\"expected\":\"true\",\"actual\":\"true\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"F09.unicode-property-escape\",\"expected\":\"true\",\"actual\":\"true\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"F06.resizable-buffer\",\"expected\":\"true|16|function\",\"actual\":\"true|16|function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.BigInt\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.BigInt64Array\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.BigUint64Array\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.SharedArrayBuffer\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.Atomics\",\"expected\":\"object\",\"actual\":\"object\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.Intl\",\"expected\":\"object\",\"actual\":\"object\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.Iterator\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.DisposableStack\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.AsyncDisposableStack\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.SuppressedError\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.Float16Array\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.ShadowRealm\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.WeakRef\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.FinalizationRegistry\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Array.fromAsync\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Object.groupBy\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Map.groupBy\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Promise.withResolvers\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Promise.try\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.RegExp.escape\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Math.f16round\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Set.prototype.union\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.ArrayBuffer.prototype.transfer\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.DataView.prototype.getFloat16\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.JSON.rawJSON\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.JSON.isRawJSON\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Array.prototype.toLocaleString\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"symbol.dispose\",\"expected\":\"symbol\",\"actual\":\"symbol\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"symbol.asyncDispose\",\"expected\":\"symbol\",\"actual\":\"symbol\",\"outcome\":\"matches-target\"}\r\nJ00-DONE\t39\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "source-vm",
+      "executable": "dotnet",
+      "arguments": [
+        "<Broiler.VM>/src/compositions/Broiler.VM.Composition.JavaScript.Cli/bin/Release/net10.0/Broiler.VM.Composition.JavaScript.Cli.dll",
+        "--all",
+        "--quiet",
+        "<JSeal>/diagnostics/J00/language.js"
+      ],
+      "workingDirectory": "<Broiler.VM>",
+      "timeoutSeconds": 30,
+      "stdoutLog": "source-vm.stdout.txt",
+      "stderrLog": "source-vm.stderr.txt",
+      "exitCode": 0,
+      "timedOut": false,
+      "stdout": "J00\t{\"id\":\"V07.array-species\",\"expected\":\"true\",\"actual\":\"false\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"V09.concat-spreadable\",\"expected\":\"a\",\"actual\":\"[object Object]\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"V04.regexp-guard\",\"expected\":\"throw:TypeError\",\"actual\":\"false\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"V01.numeric-coercion-order\",\"expected\":\"ab\",\"actual\":\"ba\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"V02.frozen-symbol\",\"expected\":\"0\",\"actual\":\"1\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"V05.mapped-arguments\",\"expected\":\"7\",\"actual\":\"1\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"V14.direct-eval\",\"expected\":\"7\",\"actual\":\"throw:EvalError\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"F08.normalization\",\"expected\":\"true\",\"actual\":\"throw:TypeError\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"F09.unicode-property-escape\",\"expected\":\"true\",\"actual\":\"throw:SyntaxError\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"F06.resizable-buffer\",\"expected\":\"true|16|function\",\"actual\":\"||undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.BigInt\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.BigInt64Array\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.BigUint64Array\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.SharedArrayBuffer\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.Atomics\",\"expected\":\"object\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.Intl\",\"expected\":\"object\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.Iterator\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.DisposableStack\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.AsyncDisposableStack\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.SuppressedError\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.Float16Array\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.ShadowRealm\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"global.WeakRef\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"global.FinalizationRegistry\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Array.fromAsync\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"method.Object.groupBy\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Map.groupBy\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Promise.withResolvers\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Promise.try\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.RegExp.escape\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"method.Math.f16round\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.Set.prototype.union\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.ArrayBuffer.prototype.transfer\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"method.DataView.prototype.getFloat16\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"method.JSON.rawJSON\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"method.JSON.isRawJSON\",\"expected\":\"function\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"method.Array.prototype.toLocaleString\",\"expected\":\"function\",\"actual\":\"function\",\"outcome\":\"matches-target\"}\r\nJ00\t{\"id\":\"symbol.dispose\",\"expected\":\"symbol\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00\t{\"id\":\"symbol.asyncDispose\",\"expected\":\"symbol\",\"actual\":\"undefined\",\"outcome\":\"differs-from-target\"}\r\nJ00-DONE\t39\r\n",
+      "stderr": ""
+    }
+  ],
+  "runs": [
+    {
+      "name": "provider-js",
+      "targetKind": "JSeal source adapter over pinned NuGet engines",
+      "assemblies": [
+        {
+          "name": "Broiler.JavaScript.Ast.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "e976d8c1926bed3e0dae511e884d86e8908af44d9eb9e09e7c809495534e6a28"
+        },
+        {
+          "name": "Broiler.JavaScript.BuiltIns.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "8c9e17405eddbc36bbb0e0a46b176003b7e05f2aae61c56512143c2163650ecb"
+        },
+        {
+          "name": "Broiler.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "0bed7bfec157b9189450821ee6bfeb0d22b02924e02c3a7169516fd24c261ff2"
+        },
+        {
+          "name": "Broiler.JavaScript.Engine.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "3399a93308e273d947c724afeb7ff1dc5c0a43bc7d36e6c2bbd1c80366a2e6b5"
+        },
+        {
+          "name": "Broiler.JavaScript.ExpressionCompiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "bce6d5f2dd6083879ee9a021634dc2cf1dad87dd87434743f9d0515793d374a8"
+        },
+        {
+          "name": "Broiler.JavaScript.Expressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "9b099a1a76082a8d943bf1c8b9b87bb16e828dd7c411bdfef3a3b3892a041b68"
+        },
+        {
+          "name": "Broiler.JavaScript.Extensions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "095f00c3a6afd16886baa5d5de62909fd394bef59ce83a3f2fc820361b1c27fc"
+        },
+        {
+          "name": "Broiler.JavaScript.Globals.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "d3ca8b95a6e6baaecfb2922990d7189bab14cacbd58892795e49d8fa2a933140"
+        },
+        {
+          "name": "Broiler.JavaScript.LinqExpressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "6debd7c24fd83264bcef239b1899df8687735887ce86c6c00fe3ceab57ae6e08"
+        },
+        {
+          "name": "Broiler.JavaScript.Parser.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "ce69fa9e24577f777263e1fa6b9bc6c6943f90a713f6bda4ecb34ff4800f939c"
+        },
+        {
+          "name": "Broiler.JavaScript.Runtime.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "a72c554a38ee1312d040e9aee080ef79d565669fcb55b333c4dac9e1bb23df57"
+        },
+        {
+          "name": "Broiler.JavaScript.Storage.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "d6c0bf733221fcf7f4b6fd8a35f54b3d23c33aa4d960b52f7b100e1b6077b030"
+        },
+        {
+          "name": "Broiler.JSeal.BroilerJs.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "dc45d34f5c74bcc5a705911762fdf6c5309a536aa3118dd12b838674369d10ed"
+        },
+        {
+          "name": "Broiler.JSeal.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "d0418fb8cd1a1fdf80349c0e385391361676a5bab35b93558694ecb8d865f331"
+        },
+        {
+          "name": "Broiler.JSeal.Vm.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "47d0ef29b0fae5db856751837385409f93e4023370e1e582445a76c2cca11d1a"
+        },
+        {
+          "name": "Broiler.Regex.dll",
+          "productVersion": "0.1.0-preview.1+383bc0aada62d943aef0da6f21da0a939a5407b7",
+          "sha256": "ad748904bce28725e9c1dd145dc99c162b1a2a66d2acff3a77179bce8fe740ad"
+        },
+        {
+          "name": "Broiler.Unicode.Properties.dll",
+          "productVersion": "0.1.0-preview.1+5d7136fd9ca6e8c17e1fca490c66870f63d8653d",
+          "sha256": "45d8126a39abb7da9188fe120577ca792e8acf3dda21f28c7c4e3aec91b163fd"
+        },
+        {
+          "name": "Broiler.VM.Abstractions.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "ffc640ce100dcbb81df737f04a5bba5a96b847b9ecce21ce1948598253cc694f"
+        },
+        {
+          "name": "Broiler.VM.Binary.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "d8d9b841a76bc8baca2f29ad988af2984cc5e56ed437876e63e3a052b68707eb"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "85beb30a4d542d4774e7f8cf1da8f7a6b4cac2cc9c228b66d2caec54a0fa5183"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "6b925c5925d1123f512837446ef16afe548581aa828a1bca9ab0fe43579b18b8"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Format.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "f965c5f9a7a000654631d8dce6f4aadc7c52417ab6be6a71116604873982a17c"
+        },
+        {
+          "name": "Broiler.VM.Runtime.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "9cfacba7bec6eacc162846dca6abe926ef66bb9080aec445a338dd56b8596c52"
+        },
+        {
+          "name": "ProviderProbes.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "9018d5adaf637329550b2f3b5263225bce81244d2030a347a0c26c56c651087e"
+        }
+      ],
+      "observations": [
+        {
+          "id": "J03.arguments",
+          "expected": "7",
+          "actual": "throw:System.InvalidOperationException",
+          "outcome": "differs-from-target",
+          "exceptionMessage": "JSArgumentsBuilder is not initialized. Ensure the Broiler.JavaScript.Modules assembly is available.",
+          "kind": "behavior"
+        },
+        {
+          "id": "J04.eval-permissive-control",
+          "expected": "42",
+          "actual": "42",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J04.eval-restricted",
+          "expected": "SyntaxError",
+          "actual": "SyntaxError",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J05.callable-proxy",
+          "expected": "Function;result=42",
+          "actual": "Object;result=42",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J06.getter-exception",
+          "expected": "JsEngineException;thrown=42",
+          "actual": "throw:Broiler.JavaScript.Runtime.JSException",
+          "outcome": "differs-from-target",
+          "exceptionMessage": "42",
+          "kind": "behavior"
+        },
+        {
+          "id": "J07.coercion-exception",
+          "expected": "JsEngineException;thrown=42",
+          "actual": "throw:Broiler.JavaScript.Runtime.JSException",
+          "outcome": "differs-from-target",
+          "exceptionMessage": "42",
+          "kind": "behavior"
+        },
+        {
+          "id": "J08.undefined-precedence",
+          "expected": "Undefined",
+          "actual": "String",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "inventory.Array.fromAsync",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "availability"
+        },
+        {
+          "id": "inventory.Object.groupBy",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "availability"
+        },
+        {
+          "id": "inventory.Map.groupBy",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "availability"
+        }
+      ]
+    },
+    {
+      "name": "provider-vm",
+      "targetKind": "JSeal source adapter over pinned NuGet engines",
+      "assemblies": [
+        {
+          "name": "Broiler.JavaScript.Ast.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "e976d8c1926bed3e0dae511e884d86e8908af44d9eb9e09e7c809495534e6a28"
+        },
+        {
+          "name": "Broiler.JavaScript.BuiltIns.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "8c9e17405eddbc36bbb0e0a46b176003b7e05f2aae61c56512143c2163650ecb"
+        },
+        {
+          "name": "Broiler.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "0bed7bfec157b9189450821ee6bfeb0d22b02924e02c3a7169516fd24c261ff2"
+        },
+        {
+          "name": "Broiler.JavaScript.Engine.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "3399a93308e273d947c724afeb7ff1dc5c0a43bc7d36e6c2bbd1c80366a2e6b5"
+        },
+        {
+          "name": "Broiler.JavaScript.ExpressionCompiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "bce6d5f2dd6083879ee9a021634dc2cf1dad87dd87434743f9d0515793d374a8"
+        },
+        {
+          "name": "Broiler.JavaScript.Expressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "9b099a1a76082a8d943bf1c8b9b87bb16e828dd7c411bdfef3a3b3892a041b68"
+        },
+        {
+          "name": "Broiler.JavaScript.Extensions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "095f00c3a6afd16886baa5d5de62909fd394bef59ce83a3f2fc820361b1c27fc"
+        },
+        {
+          "name": "Broiler.JavaScript.Globals.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "d3ca8b95a6e6baaecfb2922990d7189bab14cacbd58892795e49d8fa2a933140"
+        },
+        {
+          "name": "Broiler.JavaScript.LinqExpressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "6debd7c24fd83264bcef239b1899df8687735887ce86c6c00fe3ceab57ae6e08"
+        },
+        {
+          "name": "Broiler.JavaScript.Parser.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "ce69fa9e24577f777263e1fa6b9bc6c6943f90a713f6bda4ecb34ff4800f939c"
+        },
+        {
+          "name": "Broiler.JavaScript.Runtime.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "a72c554a38ee1312d040e9aee080ef79d565669fcb55b333c4dac9e1bb23df57"
+        },
+        {
+          "name": "Broiler.JavaScript.Storage.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "d6c0bf733221fcf7f4b6fd8a35f54b3d23c33aa4d960b52f7b100e1b6077b030"
+        },
+        {
+          "name": "Broiler.JSeal.BroilerJs.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "dc45d34f5c74bcc5a705911762fdf6c5309a536aa3118dd12b838674369d10ed"
+        },
+        {
+          "name": "Broiler.JSeal.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "d0418fb8cd1a1fdf80349c0e385391361676a5bab35b93558694ecb8d865f331"
+        },
+        {
+          "name": "Broiler.JSeal.Vm.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "47d0ef29b0fae5db856751837385409f93e4023370e1e582445a76c2cca11d1a"
+        },
+        {
+          "name": "Broiler.Regex.dll",
+          "productVersion": "0.1.0-preview.1+383bc0aada62d943aef0da6f21da0a939a5407b7",
+          "sha256": "ad748904bce28725e9c1dd145dc99c162b1a2a66d2acff3a77179bce8fe740ad"
+        },
+        {
+          "name": "Broiler.Unicode.Properties.dll",
+          "productVersion": "0.1.0-preview.1+5d7136fd9ca6e8c17e1fca490c66870f63d8653d",
+          "sha256": "45d8126a39abb7da9188fe120577ca792e8acf3dda21f28c7c4e3aec91b163fd"
+        },
+        {
+          "name": "Broiler.VM.Abstractions.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "ffc640ce100dcbb81df737f04a5bba5a96b847b9ecce21ce1948598253cc694f"
+        },
+        {
+          "name": "Broiler.VM.Binary.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "d8d9b841a76bc8baca2f29ad988af2984cc5e56ed437876e63e3a052b68707eb"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "85beb30a4d542d4774e7f8cf1da8f7a6b4cac2cc9c228b66d2caec54a0fa5183"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "6b925c5925d1123f512837446ef16afe548581aa828a1bca9ab0fe43579b18b8"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Format.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "f965c5f9a7a000654631d8dce6f4aadc7c52417ab6be6a71116604873982a17c"
+        },
+        {
+          "name": "Broiler.VM.Runtime.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "9cfacba7bec6eacc162846dca6abe926ef66bb9080aec445a338dd56b8596c52"
+        },
+        {
+          "name": "ProviderProbes.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "9018d5adaf637329550b2f3b5263225bce81244d2030a347a0c26c56c651087e"
+        }
+      ],
+      "observations": [
+        {
+          "id": "J03.arguments",
+          "expected": "7",
+          "actual": "7",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J04.eval-permissive-control",
+          "expected": "42",
+          "actual": "42",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J04.eval-restricted",
+          "expected": "SyntaxError",
+          "actual": "42",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J05.callable-proxy",
+          "expected": "Function;result=42",
+          "actual": "Function;result=42",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J06.getter-exception",
+          "expected": "JsEngineException;thrown=42",
+          "actual": "JsEngineException;thrown=42",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J07.coercion-exception",
+          "expected": "JsEngineException;thrown=42",
+          "actual": "JsEngineException;thrown=42",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "J08.undefined-precedence",
+          "expected": "Undefined",
+          "actual": "Undefined",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        },
+        {
+          "id": "inventory.Array.fromAsync",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "availability"
+        },
+        {
+          "id": "inventory.Object.groupBy",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "availability"
+        },
+        {
+          "id": "inventory.Map.groupBy",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "exceptionMessage": null,
+          "kind": "availability"
+        }
+      ]
+    },
+    {
+      "name": "registry",
+      "targetKind": "JSeal contracts in an isolated process",
+      "assemblies": [
+        {
+          "name": "Broiler.JavaScript.Ast.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "e976d8c1926bed3e0dae511e884d86e8908af44d9eb9e09e7c809495534e6a28"
+        },
+        {
+          "name": "Broiler.JavaScript.BuiltIns.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "8c9e17405eddbc36bbb0e0a46b176003b7e05f2aae61c56512143c2163650ecb"
+        },
+        {
+          "name": "Broiler.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "0bed7bfec157b9189450821ee6bfeb0d22b02924e02c3a7169516fd24c261ff2"
+        },
+        {
+          "name": "Broiler.JavaScript.Engine.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "3399a93308e273d947c724afeb7ff1dc5c0a43bc7d36e6c2bbd1c80366a2e6b5"
+        },
+        {
+          "name": "Broiler.JavaScript.ExpressionCompiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "bce6d5f2dd6083879ee9a021634dc2cf1dad87dd87434743f9d0515793d374a8"
+        },
+        {
+          "name": "Broiler.JavaScript.Expressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "9b099a1a76082a8d943bf1c8b9b87bb16e828dd7c411bdfef3a3b3892a041b68"
+        },
+        {
+          "name": "Broiler.JavaScript.Extensions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "095f00c3a6afd16886baa5d5de62909fd394bef59ce83a3f2fc820361b1c27fc"
+        },
+        {
+          "name": "Broiler.JavaScript.Globals.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "d3ca8b95a6e6baaecfb2922990d7189bab14cacbd58892795e49d8fa2a933140"
+        },
+        {
+          "name": "Broiler.JavaScript.LinqExpressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "6debd7c24fd83264bcef239b1899df8687735887ce86c6c00fe3ceab57ae6e08"
+        },
+        {
+          "name": "Broiler.JavaScript.Parser.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "ce69fa9e24577f777263e1fa6b9bc6c6943f90a713f6bda4ecb34ff4800f939c"
+        },
+        {
+          "name": "Broiler.JavaScript.Runtime.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "a72c554a38ee1312d040e9aee080ef79d565669fcb55b333c4dac9e1bb23df57"
+        },
+        {
+          "name": "Broiler.JavaScript.Storage.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "d6c0bf733221fcf7f4b6fd8a35f54b3d23c33aa4d960b52f7b100e1b6077b030"
+        },
+        {
+          "name": "Broiler.JSeal.BroilerJs.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "dc45d34f5c74bcc5a705911762fdf6c5309a536aa3118dd12b838674369d10ed"
+        },
+        {
+          "name": "Broiler.JSeal.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "d0418fb8cd1a1fdf80349c0e385391361676a5bab35b93558694ecb8d865f331"
+        },
+        {
+          "name": "Broiler.JSeal.Vm.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "47d0ef29b0fae5db856751837385409f93e4023370e1e582445a76c2cca11d1a"
+        },
+        {
+          "name": "Broiler.Regex.dll",
+          "productVersion": "0.1.0-preview.1+383bc0aada62d943aef0da6f21da0a939a5407b7",
+          "sha256": "ad748904bce28725e9c1dd145dc99c162b1a2a66d2acff3a77179bce8fe740ad"
+        },
+        {
+          "name": "Broiler.Unicode.Properties.dll",
+          "productVersion": "0.1.0-preview.1+5d7136fd9ca6e8c17e1fca490c66870f63d8653d",
+          "sha256": "45d8126a39abb7da9188fe120577ca792e8acf3dda21f28c7c4e3aec91b163fd"
+        },
+        {
+          "name": "Broiler.VM.Abstractions.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "ffc640ce100dcbb81df737f04a5bba5a96b847b9ecce21ce1948598253cc694f"
+        },
+        {
+          "name": "Broiler.VM.Binary.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "d8d9b841a76bc8baca2f29ad988af2984cc5e56ed437876e63e3a052b68707eb"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "85beb30a4d542d4774e7f8cf1da8f7a6b4cac2cc9c228b66d2caec54a0fa5183"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "6b925c5925d1123f512837446ef16afe548581aa828a1bca9ab0fe43579b18b8"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Format.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "f965c5f9a7a000654631d8dce6f4aadc7c52417ab6be6a71116604873982a17c"
+        },
+        {
+          "name": "Broiler.VM.Runtime.dll",
+          "productVersion": "0.1.0-preview.3+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "9cfacba7bec6eacc162846dca6abe926ef66bb9080aec445a338dd56b8596c52"
+        },
+        {
+          "name": "ProviderProbes.dll",
+          "productVersion": "0.1.0-preview.1+d64ebec877e9cd017f1ddd0e9e8f1b52c592d24f",
+          "sha256": "9018d5adaf637329550b2f3b5263225bce81244d2030a347a0c26c56c651087e"
+        }
+      ],
+      "observations": [
+        {
+          "id": "J10.default-after-removal",
+          "expected": "broiler-vm",
+          "actual": "default-unavailable;HasAny=True",
+          "outcome": "differs-from-target",
+          "exceptionMessage": null,
+          "kind": "behavior"
+        }
+      ]
+    },
+    {
+      "name": "source-js",
+      "targetKind": "Current-source CLI; explicit script goal",
+      "assemblies": [
+        {
+          "name": "Broiler.JavaScript.Ast.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "77e4ad299a5839eef220441be7f28ae434641638ebae12edb62d9c199751ac8b"
+        },
+        {
+          "name": "Broiler.JavaScript.BuiltIns.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "9bd7590a0a286438c75da0febbbca0155355ccc1eb37745a210469373b28b0cb"
+        },
+        {
+          "name": "Broiler.JavaScript.Clr.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "63b43bbcc9e297b0bb9f7cc31be5cf87157ac8a4a6c298b546f521553964521b"
+        },
+        {
+          "name": "Broiler.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "6cb8cf62bb7624a7dc809a4786c2400d699cb759eed24fbcd86661d4403cc4fb"
+        },
+        {
+          "name": "Broiler.JavaScript.Engine.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "8f82ea71595dd3d383bbf579982820f98676b0bcff106d4f134f92f2ed08bf38"
+        },
+        {
+          "name": "Broiler.JavaScript.ExpressionCompiler.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "7157b440eecc53319b9f92fda6235fd2534a0cf43fa9b4c3be278795514b5cbe"
+        },
+        {
+          "name": "Broiler.JavaScript.Expressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "99fbbe63026446aed1642d1864eb9eedb8975ca812f4f079809085138e7ad322"
+        },
+        {
+          "name": "Broiler.JavaScript.Extensions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "0f0059bd3ce1e37db2b7c8aef3c7e894cf019855530e949a3366fbd32ac8f41a"
+        },
+        {
+          "name": "Broiler.JavaScript.Globals.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "a863fbe37ebb9a5a6b734bfc45a5cd5bba3ccfdee115a6aec7f0aeb265c83b47"
+        },
+        {
+          "name": "Broiler.JavaScript.LinqExpressions.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "45bbd392f5deb6189303119d05debda2cef89f089d62599885b5f5f47402c7e6"
+        },
+        {
+          "name": "Broiler.JavaScript.Modules.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "be28074279f80d294e0acdfbd2998d8a14c6d7a1137c071ba891891866c6482b"
+        },
+        {
+          "name": "Broiler.JavaScript.Parser.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "982be6da6480708702c9731c864b5c0eaf696a2fec1585ca6c44f65aa36b681e"
+        },
+        {
+          "name": "Broiler.JavaScript.Runtime.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "3fd1fd0850117fe841326515d2e9eb0902054ecaddad059a47ae95da23ca39f5"
+        },
+        {
+          "name": "Broiler.JavaScript.Storage.dll",
+          "productVersion": "0.1.0-preview.1+73f071d1f1e1d5404018bc5337d6dafc74011676",
+          "sha256": "0c3522e2dc303f58eff617b1c5ae5f15388bc33cf29f67a03e64db4275a60e01"
+        },
+        {
+          "name": "Broiler.Regex.dll",
+          "productVersion": "0.1.0-preview.1+383bc0aada62d943aef0da6f21da0a939a5407b7",
+          "sha256": "ad748904bce28725e9c1dd145dc99c162b1a2a66d2acff3a77179bce8fe740ad"
+        },
+        {
+          "name": "Broiler.Unicode.Properties.dll",
+          "productVersion": "0.1.0-preview.1+5d7136fd9ca6e8c17e1fca490c66870f63d8653d",
+          "sha256": "45d8126a39abb7da9188fe120577ca792e8acf3dda21f28c7c4e3aec91b163fd"
+        },
+        {
+          "name": "BroilerJS.dll",
+          "productVersion": "0.0.0+73f071d1f1",
+          "sha256": "1d6f4c15d54644e431eeb22a623a5d4a24195d4ceb0b4d2ffcc2a211c6b8936a"
+        }
+      ],
+      "observations": [
+        {
+          "id": "V07.array-species",
+          "expected": "true",
+          "actual": "true",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V09.concat-spreadable",
+          "expected": "a",
+          "actual": "a",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V04.regexp-guard",
+          "expected": "throw:TypeError",
+          "actual": "throw:TypeError",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V01.numeric-coercion-order",
+          "expected": "ab",
+          "actual": "ab",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V02.frozen-symbol",
+          "expected": "0",
+          "actual": "0",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V05.mapped-arguments",
+          "expected": "7",
+          "actual": "7",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V14.direct-eval",
+          "expected": "7",
+          "actual": "7",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "F08.normalization",
+          "expected": "true",
+          "actual": "true",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "F09.unicode-property-escape",
+          "expected": "true",
+          "actual": "true",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "F06.resizable-buffer",
+          "expected": "true|16|function",
+          "actual": "true|16|function",
+          "outcome": "matches-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "global.BigInt",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.BigInt64Array",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.BigUint64Array",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.SharedArrayBuffer",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Atomics",
+          "expected": "object",
+          "actual": "object",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Intl",
+          "expected": "object",
+          "actual": "object",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Iterator",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.DisposableStack",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.AsyncDisposableStack",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.SuppressedError",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Float16Array",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.ShadowRealm",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.WeakRef",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.FinalizationRegistry",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Array.fromAsync",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Object.groupBy",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Map.groupBy",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Promise.withResolvers",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Promise.try",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.RegExp.escape",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Math.f16round",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Set.prototype.union",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.ArrayBuffer.prototype.transfer",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.DataView.prototype.getFloat16",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.JSON.rawJSON",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.JSON.isRawJSON",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Array.prototype.toLocaleString",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "symbol.dispose",
+          "expected": "symbol",
+          "actual": "symbol",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "symbol.asyncDispose",
+          "expected": "symbol",
+          "actual": "symbol",
+          "outcome": "matches-target",
+          "kind": "availability"
+        }
+      ]
+    },
+    {
+      "name": "source-vm",
+      "targetKind": "Current-source CLI; wide script goal with optional surfaces admitted",
+      "assemblies": [
+        {
+          "name": "Broiler.VM.Abstractions.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "47cbce5c5f94c6bd64e4d3c03d0dd01dc267429623ec5330e505bf4c35ce413c"
+        },
+        {
+          "name": "Broiler.VM.Binary.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "be1277f15572552d54a9c9d976ca1110b9f7b6635ba3969753630a91f8a8ee70"
+        },
+        {
+          "name": "Broiler.VM.Composition.JavaScript.Cli.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "da7a0343ad93d133e42b81b7dfc0005aec7b930b2fa9c569cb135403b3ecf2bc"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Compiler.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "fc67d9864756adf96fccb0920833e2aa04dd2bf4b0e9232618581fa8282e61cc"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "0f5c730cf3a6511cd30e379752bb24b2d9ab5f4d37c10d8bb8fe6c86757bb9a3"
+        },
+        {
+          "name": "Broiler.VM.Profile.JavaScript.Format.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "a8ec9e8ec6f8e46527c492c68293dcb1d40a548cb8ed5924bebaeedcd3522967"
+        },
+        {
+          "name": "Broiler.VM.Runtime.dll",
+          "productVersion": "0.1.0-preview.1+405fe2d234bbae69b1ea70dac603bbfe24978760",
+          "sha256": "fae2b93294c0c1462f6fb2a4d2042de73572de23ee310b136c2df0fb863e0244"
+        }
+      ],
+      "observations": [
+        {
+          "id": "V07.array-species",
+          "expected": "true",
+          "actual": "false",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V09.concat-spreadable",
+          "expected": "a",
+          "actual": "[object Object]",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V04.regexp-guard",
+          "expected": "throw:TypeError",
+          "actual": "false",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V01.numeric-coercion-order",
+          "expected": "ab",
+          "actual": "ba",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V02.frozen-symbol",
+          "expected": "0",
+          "actual": "1",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V05.mapped-arguments",
+          "expected": "7",
+          "actual": "1",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "V14.direct-eval",
+          "expected": "7",
+          "actual": "throw:EvalError",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "F08.normalization",
+          "expected": "true",
+          "actual": "throw:TypeError",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "F09.unicode-property-escape",
+          "expected": "true",
+          "actual": "throw:SyntaxError",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "F06.resizable-buffer",
+          "expected": "true|16|function",
+          "actual": "||undefined",
+          "outcome": "differs-from-target",
+          "kind": "behavior"
+        },
+        {
+          "id": "global.BigInt",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.BigInt64Array",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.BigUint64Array",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.SharedArrayBuffer",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Atomics",
+          "expected": "object",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Intl",
+          "expected": "object",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Iterator",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.DisposableStack",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.AsyncDisposableStack",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.SuppressedError",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.Float16Array",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.ShadowRealm",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.WeakRef",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "global.FinalizationRegistry",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Array.fromAsync",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Object.groupBy",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Map.groupBy",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Promise.withResolvers",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Promise.try",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.RegExp.escape",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Math.f16round",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Set.prototype.union",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.ArrayBuffer.prototype.transfer",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.DataView.prototype.getFloat16",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.JSON.rawJSON",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.JSON.isRawJSON",
+          "expected": "function",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "method.Array.prototype.toLocaleString",
+          "expected": "function",
+          "actual": "function",
+          "outcome": "matches-target",
+          "kind": "availability"
+        },
+        {
+          "id": "symbol.dispose",
+          "expected": "symbol",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        },
+        {
+          "id": "symbol.asyncDispose",
+          "expected": "symbol",
+          "actual": "undefined",
+          "outcome": "differs-from-target",
+          "kind": "availability"
+        }
+      ]
+    }
+  ],
+  "dotnetSdk": "10.0.401",
+  "resolvedEnginePackages": [
+    {
+      "identity": "Broiler.JavaScript.Ast/0.1.0-preview.1",
+      "sha512": "CzPfxYo0YNb0C0P4xaUr521Cxw0lxUGx7SWymwM8uWeaGesohruD+YHGYqDpwxplgQ8DEuonPtv+t2Adnn0VnA=="
+    },
+    {
+      "identity": "Broiler.JavaScript.BuiltIns/0.1.0-preview.1",
+      "sha512": "PFmMI4SOvVK4ObOT4/cPwr3nWcagxKcbqGnEIaKSNU6moOPIVjp3Owk7Vs1aRJG8v35o/YLodCNulbHQHe1DWQ=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Compiler/0.1.0-preview.1",
+      "sha512": "UtEajbVeG+inB8/x+F4Ag0uPUb9UYUbT0v796XOq/u/29Lrf5XdDqnf6XmNia9KqosbFNbnuJgRKl+iAJ3YmKA=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Engine/0.1.0-preview.1",
+      "sha512": "mUsmnQ2SlKbx9u9OelR9RuhxD1QKMdzwwnMc4yZ8DTOV4sLJGbK5phKsuGqUJ1P3cijjoEsHwkqBhX2nAVoazA=="
+    },
+    {
+      "identity": "Broiler.JavaScript.ExpressionCompiler/0.1.0-preview.1",
+      "sha512": "kLAXJy0TGZMs2E7Qe19rVAUd/Xu6svjnCILCusf8ckyCQuJ4ivBtRm2x8vnyjRSsmpKQF4w7ki3Frla7kpakgw=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Expressions/0.1.0-preview.1",
+      "sha512": "ApLRCj7A/WkkWmSV0EnNslfI5RshNDMVwFdG09q4Eni45wQZfP49XkrOYDoAqvvRIRd+ev3Eg/yO6tM6FbzH8w=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Extensions/0.1.0-preview.1",
+      "sha512": "eiCvP9hebt84Kn4RJ3MwcbPqf1OP5g9Wbd0K/vs1V2R6aJrJcB6Vx+Xep0N8WcvgUECP811LWznQW4THHcWmsQ=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Globals/0.1.0-preview.1",
+      "sha512": "h3kOagZaalSRWGuGBgsFvldQ7ITvT/40q/e4+E3kzTKlUOaPhPCvX3jUYYEQro7Hvq2MC2817fVJqRcTP/crTQ=="
+    },
+    {
+      "identity": "Broiler.JavaScript.LinqExpressions/0.1.0-preview.1",
+      "sha512": "0KFEdQn7xYkzD6UOEAKKLMfWD0OzIGOXLPsM4OSLgGbjTqFanOE29S9zKIGf5BRjVq3jOTDsRMkNe1hxbnqUIg=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Parser/0.1.0-preview.1",
+      "sha512": "ZiLdPh2LZwDuUFGmhT8NcShB01yU2+hqtBL0iNSt6S6q+dNSIkE3L9zogN9m0Ml/lNg9O7N1/uLJOfmJhqCy7Q=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Runtime/0.1.0-preview.1",
+      "sha512": "7erLiIb33/UQSEq4fvFdVpkpCLWE3Fjh/K3eWIMl5nzjE7WVplLepo+JqoYaQB7Sc6FzjWHjUDAUCK7HKYFzMw=="
+    },
+    {
+      "identity": "Broiler.JavaScript.Storage/0.1.0-preview.1",
+      "sha512": "sIRaCrylxFAS1rFsI0VZjSxdDy7PoP9Qjcvo+O7+CF274UKdL/f8tP+6Gsmvl0vQ1hrpGhIh+OeYBh9Jj3O3bQ=="
+    },
+    {
+      "identity": "Broiler.Regex/0.1.0-preview.1",
+      "sha512": "r+wHNNtkKomvKDFZRozuS5gNvwAaJyfKFXxVhSDncD+/xWz9U6bjct7GJZ+3oIugPvrZhawThsQiDP/l+tpuqw=="
+    },
+    {
+      "identity": "Broiler.Unicode.Properties/0.1.0-preview.1",
+      "sha512": "X/3Kx7lID3dV+FcuUBhnnM34Wdm3R+rq/0lJQFOcIwQHwTQi7DiS47BhbeVxemthKrukGLQ9DRwfa4qk64fmlQ=="
+    },
+    {
+      "identity": "Broiler.VM.Abstractions/0.1.0-preview.3",
+      "sha512": "2/7ECF1BdBfKx8Dt7QYC6xf6J8UueTNMpKsdqtFkm7gy3B/zNhqmmH2tzzrqpJPB/XNrO2qMyYYx1NKa0N2KKg=="
+    },
+    {
+      "identity": "Broiler.VM.Binary/0.1.0-preview.3",
+      "sha512": "MMGRgXBmpkvGP6rl3gTFoCya32JsVn9dLLnbYW4G7EnX/ybaps9TNaH3vGI5SVgsUDf2wmnSoy/tyDNt6FdUnQ=="
+    },
+    {
+      "identity": "Broiler.VM.Profile.JavaScript.Compiler/0.1.0-preview.3",
+      "sha512": "0DNKKmKa8fOj3eMWVbS2VNv0Wx0sfErYF0ixqaMNam4qEx+Pje4NasiVWYKrEhniLGmPIUBbTk4T7epfYxbDig=="
+    },
+    {
+      "identity": "Broiler.VM.Profile.JavaScript.Format/0.1.0-preview.3",
+      "sha512": "juhr1dj5tsE2Y08vMJCOtlBKd3MI8BuCLMqM7QnonkzjMw7QmolqQTxFKaLZE+z3Ut/iXlgHXJqD3NbfsOBuNg=="
+    },
+    {
+      "identity": "Broiler.VM.Profile.JavaScript/0.1.0-preview.3",
+      "sha512": "ql6C4FKYYxgNRO4jvBQvX63Qnwvqmx8poyV205zxWXvlltknLqkPLTmJ5YHs84RKY+nCO7ooFWrK4evwuCotXg=="
+    },
+    {
+      "identity": "Broiler.VM.Runtime/0.1.0-preview.3",
+      "sha512": "BHOTtalv+fX3YwR6wy17GJVCdioaJ7s944QmK7rIssQTWI1lv49CpwNkH2liM5opnJ7TkvO9hZ0l0KvLPJH/Gg=="
+    }
+  ]
+}

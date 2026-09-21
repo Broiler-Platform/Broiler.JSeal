@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+    <DisableImplicitLibraryPacksFolder>true</DisableImplicitLibraryPacksFolder>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DefineConstants Condition="'$(Provider)' == 'Vm'">$(DefineConstants);CONSUMER_VM</DefineConstants>
+  </PropertyGroup>
+  <!-- Only the selected provider is direct. Its package must supply the contracts transitively. -->
+  <ItemGroup>
+    <PackageReference Include="Broiler.JSeal.$(Provider)" Version="[$(ConsumerPackageVersion)]" />
+  </ItemGroup>
+  <Target Name="ValidateConsumerInputs" BeforeTargets="CollectPackageReferences">
+    <Error Condition="'$(Provider)' != 'BroilerJs' And '$(Provider)' != 'Vm'" Text="Select BroilerJs or Vm." />
+    <Error Condition="'$(ConsumerPackageVersion)' == ''" Text="ConsumerPackageVersion is required." />
+  </Target>
+</Project>

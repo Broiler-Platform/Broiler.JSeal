@@ -6,6 +6,7 @@
     <!-- Broiler.JS engine packages for Broiler.JSeal.BroilerJs -->
     <PackageVersion Include="Broiler.JavaScript.BuiltIns" Version="0.1.0-preview.1" />
     <PackageVersion Include="Broiler.JavaScript.Globals" Version="0.1.0-preview.1" />
+    <PackageVersion Include="Broiler.JavaScript.Modules" Version="0.1.0-preview.1" />
     <PackageVersion Include="Broiler.JavaScript.Storage" Version="0.1.0-preview.1" />
 
     <!-- Broiler.VM engine packages for Broiler.JSeal.Vm -->

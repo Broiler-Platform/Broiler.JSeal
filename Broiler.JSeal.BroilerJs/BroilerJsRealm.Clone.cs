@@ -31,7 +31,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// Worker in a shape the same page could not produce at home.
 /// </para>
 /// <para>
-/// <b>Every entry point takes the realm scope</b>, for the reason the class remarks give and with one
+/// <b>Operations that clone take the realm scope</b>, for the reason the class remarks give and with one
 /// extra consequence that is the point of putting the clone on the contract at all: the engine's
 /// clone mints its objects against the <em>current</em> context. Outside a scope it would mint into
 /// whatever realm the thread last touched â€” on the worker's delivery path, plausibly the page's.
@@ -44,15 +44,18 @@ internal sealed partial class BroilerJsRealm
     /// <c>ArrayBuffer</c> is the whole of what this engine can transfer, and
     /// <c>JSArrayBuffer.Detached</c> is its <c>[[Detached]]</c> slot. No engine call is needed: both
     /// questions are answered by the object the handle already carries, which is what the contract
-    /// says a host may assume of this member.
+    /// says a host may assume of this member. It still requires a live realm.
     /// </remarks>
-    public JsTransferKind ClassifyTransferable(JsValue value) =>
-        JsProviderValue.ReferenceOf(value) switch
+    public JsTransferKind ClassifyTransferable(JsValue value)
+    {
+        ThrowIfDisposed();
+        return JsProviderValue.ReferenceOf(value) switch
         {
             JSArrayBuffer { Detached: true } => JsTransferKind.Detached,
             JSArrayBuffer => JsTransferKind.Transferable,
             _ => JsTransferKind.NotTransferable,
         };
+    }
 
     /// <inheritdoc />
     public JsValue Clone(JsValue value, ReadOnlySpan<JsValue> transfer = default)
@@ -127,9 +130,7 @@ internal sealed partial class BroilerJsRealm
     /// <summary>The <c>{ transfer: [...] }</c> options object for a non-empty transfer list.</summary>
     private static JSValue BuildTransferOptions(ReadOnlySpan<JsValue> transfer)
     {
-        var buffers = new JSValue[transfer.Length];
-        for (var i = 0; i < transfer.Length; i++)
-            buffers[i] = BroilerJsMarshal.Unwrap(transfer[i]);
+        var buffers = UnwrapAll(transfer);
 
         var options = new JSObject();
         options.FastAddValue(

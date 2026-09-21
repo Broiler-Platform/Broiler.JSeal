@@ -173,7 +173,14 @@ internal sealed partial class BroilerJsRealm : IJsRealm
     /// one of its properties. That is what <see cref="JsCapabilities.GlobalIsVariableScope"/> asserts,
     /// and the reason this member can be a plain wrap rather than a lookup.
     /// </remarks>
-    public JsValue Global => BroilerJsMarshal.Wrap(_context);
+    public JsValue Global
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return BroilerJsMarshal.Wrap(_context);
+        }
+    }
 
     /// <inheritdoc />
     public JsCapabilities Capabilities => _capabilities;
@@ -196,9 +203,10 @@ internal sealed partial class BroilerJsRealm : IJsRealm
         // execute page script against a document the host has already finished with.
         _jobs.Clear();
 
-        // Unsubscribed before the context goes, and unconditionally: -= on a handler that was never
-        // added is a no-op, so this needs no second reading of the option that decided it.
-        _context.EvalEvent -= RefuseGuestCompilation;
+        // An adopted context may have other wrappers. Remove only our own subscription;
+        // removing this shared static handler without having added it would remove theirs.
+        if (!_allowGuestEval)
+            _context.EvalEvent -= RefuseGuestCompilation;
 
         // An adopted context belongs to the host that built it, and that host disposes it â€” in this
         // repository, InteractiveSession, which tears the bridge down first and then disposes the

@@ -1,4 +1,4 @@
-﻿namespace Broiler.JSeal;
+namespace Broiler.JSeal;
 
 /// <summary>
 /// Host-defined property lookup, for the six DOM objects whose members are not a fixed list: live
@@ -35,11 +35,24 @@ public interface IJsExotic
     /// Answers a named lookup the object's ordinary properties did not, or reports that there is no
     /// such property.
     /// </summary>
+    /// <remarks>
+    /// An existing own or inherited ordinary property takes precedence even when its value is
+    /// <c>undefined</c>. An ordinary getter runs once per read with the original receiver; returning
+    /// <c>undefined</c> does not cause a fallback to this hook.
+    /// </remarks>
     bool TryGetNamed(string name, out JsValue value);
 
     /// <summary>
     /// Answers an integer-indexed lookup the object's ordinary properties did not.
     /// </summary>
+    /// <remarks>
+    /// Every index below <see cref="IndexedLength"/> must return true, including entries whose
+    /// value is <c>undefined</c>. Holes within that dense range are invalid; providers report an
+    /// <see cref="InvalidOperationException"/> when validation encounters one. Indices at or above
+    /// the bound are absent from the handler. Ordinary own indexed properties retain precedence.
+    /// Handler entries are enumerable, configurable and read-only; defining an ordinary indexed
+    /// property explicitly overrides an entry without making that property part of the collection.
+    /// </remarks>
     bool TryGetIndex(uint index, out JsValue value);
 
     /// <summary>
@@ -55,15 +68,13 @@ public interface IJsExotic
     /// </summary>
     IReadOnlyList<string> SupportedNames { get; }
 
-    /// <summary>
-    /// How many integer-indexed elements this object currently has â€” its <c>length</c> for
-    /// enumeration purposes.
-    /// </summary>
+    /// <summary>The exclusive upper bound of the handler's dense indexed range.</summary>
     /// <remarks>
-    /// Asked immediately before an enumeration, so a live collection reports what it holds now rather
-    /// than what it held when it was minted. The Broiler.JS provider uses this to materialise the
-    /// index properties its engine's enumeration requires, which is a fact about that engine's
-    /// property storage and stays inside the provider.
+    /// All indices from zero through length minus one must be supplied by TryGetIndex. To withdraw
+    /// entries, shrink this bound; replacement and later growth are supported. The range must stay
+    /// consistent during one operation, and may change between operations. Providers may validate
+    /// entries while reading or enumerating. Shrinkage removes only handler-owned entries, never
+    /// ordinary indexed properties installed by the host or guest.
     /// </remarks>
     uint IndexedLength { get; }
 }

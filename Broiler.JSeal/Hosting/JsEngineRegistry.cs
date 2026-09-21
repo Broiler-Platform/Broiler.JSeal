@@ -1,114 +1,52 @@
-﻿using System.Collections.Concurrent;
+﻿namespace Broiler.JSeal;
 
-namespace Broiler.JSeal;
-
-/// <summary>
-/// The engines this process can use, and which one it uses by default.
-/// </summary>
+/// <summary>The registered engines and default selection for this process.</summary>
 /// <remarks>
-/// <para>
-/// <b>Why a registry rather than a <c>#if</c>.</b> Today one <c>#if BROILER_VM_JS</c> in
-/// <c>BrowserApp.NewScriptEngine()</c> decides the engine, which means the decision is a property of
-/// the binary: a build serves one engine and cannot be asked about another. Two things that matters
-/// for are already wanted. A conformance suite that runs the same assertions against every registered
-/// provider needs two in one process. And a bisect â€” "does this page render differently on the other
-/// engine?" â€” is a question about a run, not about a build.
-/// </para>
-/// <para>
-/// <b>What stays a build-time decision, and should.</b> Whether an engine's assemblies are <em>linked
-/// at all</em> is still a <c>ProjectReference</c> under a configuration condition, because that is
-/// what keeps <c>Debug</c> free of Broiler.VM and keeps the component-graph check meaningful. The
-/// registry decides among the providers that are present; the build decides which are present. A
-/// provider registers itself from the assembly that carries it, so an engine that was not linked
-/// simply never appears here.
-/// </para>
-/// <para>
-/// Registration is process-wide and thread-safe. Re-registering a name replaces the provider, which is
-/// what a test that substitutes a recording provider needs; nothing else should.
-/// </para>
+/// Hosts choose which provider packages to reference and register; the registry selects among
+/// providers already loaded. Registration and selection are synchronized, and enumeration returns
+/// a snapshot. This does not make realm execution concurrent. Register providers explicitly when
+/// selection must be available before their assemblies would otherwise load.
 /// </remarks>
 public static class JsEngineRegistry
 {
-    private static readonly ConcurrentDictionary<string, IJsEngineProvider> Providers =
-        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly JsEngineRegistryState State = new();
 
-    private static string? _defaultName;
-
-    /// <summary>
-    /// The environment variable a run may set to choose an engine by <see cref="IJsEngineProvider.Name"/>,
-    /// overriding the registered default.
-    /// </summary>
+    /// <summary>The environment variable that selects a registered engine for a run.</summary>
     public const string SelectionEnvironmentVariable = "BROILER_JS_ENGINE";
 
     /// <summary>
-    /// Adds or replaces a provider. The first provider registered also becomes the default, so a
-    /// process that links exactly one engine needs no further configuration.
+    /// Adds or replaces a provider. The first registration becomes the default. Names are matched
+    /// case-insensitively; replacing a name preserves its selection as default.
     /// </summary>
-    public static void Register(IJsEngineProvider provider)
-    {
-        ArgumentNullException.ThrowIfNull(provider);
-
-        Providers[provider.Name] = provider;
-        Interlocked.CompareExchange(ref _defaultName, provider.Name, null);
-    }
-
-    /// <summary>Removes a provider, answering whether one was there.</summary>
-    public static bool Unregister(string name) => Providers.TryRemove(name, out _);
-
-    /// <summary>Every registered provider, in no particular order.</summary>
-    public static IReadOnlyCollection<IJsEngineProvider> All => Providers.Values.ToArray();
-
-    /// <summary>The provider registered under <paramref name="name"/>, or <see langword="null"/>.</summary>
-    public static IJsEngineProvider? Find(string name) =>
-        Providers.TryGetValue(name, out var provider) ? provider : null;
+    public static void Register(IJsEngineProvider provider) => State.Register(provider);
 
     /// <summary>
-    /// Names the provider this process should use by default. Throws when nothing is registered under
-    /// that name, because a typo in a configuration should be loud rather than silently served by
-    /// whichever engine happened to register first.
+    /// Removes a provider, answering whether one was there. Removing the selected default chooses
+    /// the remaining name first in ordinal, case-insensitive order, or clears the default if empty.
     /// </summary>
-    public static void SetDefault(string name)
-    {
-        if (!Providers.ContainsKey(name))
-            throw new ArgumentException($"No JavaScript engine named '{name}' is registered.", nameof(name));
+    public static bool Unregister(string name) => State.Unregister(name);
 
-        _defaultName = name;
-    }
+    /// <summary>A snapshot of registered providers, in no particular order.</summary>
+    public static IReadOnlyCollection<IJsEngineProvider> All => State.All;
+
+    /// <summary>The provider registered under the name, or null.</summary>
+    public static IJsEngineProvider? Find(string name) => State.Find(name);
+
+    /// <summary>Selects a registered default; an unknown name raises ArgumentException.</summary>
+    public static void SetDefault(string name) => State.SetDefault(name);
 
     /// <summary>
-    /// The provider a page load should use: the one named by
-    /// <see cref="SelectionEnvironmentVariable"/> when it names a registered one, otherwise the
-    /// registered default.
+    /// The provider selected by BROILER_JS_ENGINE, read on each call, or the registered default.
+    /// Selection trims whitespace and ignores case. Unknown or blank environment names use the
+    /// registered default. A returned provider may subsequently be unregistered by another thread.
     /// </summary>
-    /// <exception cref="InvalidOperationException">No provider is registered at all.</exception>
-    public static IJsEngineProvider Default
-    {
-        get
-        {
-            var requested = Environment.GetEnvironmentVariable(SelectionEnvironmentVariable);
-            if (!string.IsNullOrWhiteSpace(requested) && Providers.TryGetValue(requested.Trim(), out var chosen))
-                return chosen;
-
-            if (_defaultName is { } name && Providers.TryGetValue(name, out var provider))
-                return provider;
-
-            throw new InvalidOperationException(
-                "No JavaScript engine provider is registered. A host must reference an engine provider " +
-                "assembly and call its registration entry point before loading a page.");
-        }
-    }
+    /// <exception cref="InvalidOperationException">No provider is registered.</exception>
+    public static IJsEngineProvider Default =>
+        State.GetDefault(Environment.GetEnvironmentVariable(SelectionEnvironmentVariable));
 
     /// <summary>Whether any provider is registered.</summary>
-    public static bool HasAny => !Providers.IsEmpty;
+    public static bool HasAny => State.HasAny;
 
-    /// <summary>
-    /// Drops every registration. For test isolation only â€” a suite that registers a substitute
-    /// provider has to be able to put the process back.
-    /// </summary>
-    public static void Reset()
-    {
-        Providers.Clear();
-        _defaultName = null;
-    }
+    /// <summary>Drops all registrations and default selection. Intended for isolated host/test setup.</summary>
+    public static void Reset() => State.Reset();
 }
-

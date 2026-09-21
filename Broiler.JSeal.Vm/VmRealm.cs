@@ -32,7 +32,6 @@ internal sealed partial class VmRealm : IJsRealm
     private readonly VmInstance _instance;
     private readonly VmHostBridge _bridge;
     private readonly VmSourceProvider _sources;
-    private readonly bool _ownsRuntime;
 
     private bool _disposed;
 
@@ -50,7 +49,6 @@ internal sealed partial class VmRealm : IJsRealm
         _instance = instance;
         _bridge = bridge;
         _sources = sources;
-        _ownsRuntime = true;
         Capabilities = capabilities;
         EngineName = engineName;
     }
@@ -183,9 +181,6 @@ internal sealed partial class VmRealm : IJsRealm
             return;
 
         _disposed = true;
-
-        if (!_ownsRuntime)
-            return;
 
         _instance.Dispose();
         _artifact.Dispose();

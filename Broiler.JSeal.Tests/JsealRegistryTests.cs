@@ -1,71 +1,23 @@
-using Broiler.JSeal.BroilerJs;
-using Broiler.JSeal;
+﻿using Broiler.JSeal.BroilerJs;
 
 namespace Broiler.JSeal.Tests;
 
-/// <summary>
-/// <see cref="JsEngineRegistry"/>: how a process finds out which JavaScript engines it has, and
-/// which one it uses.
-/// <para>
-/// This is the half of JSEAL a conformance suite depends on before it can assert anything â€” the
-/// theories in <see cref="JsealConformanceTests"/> are driven by <see cref="JsEngineRegistry.All"/>,
-/// so a registry that lost a provider would report a green suite that ran no assertions at all. The
-/// first test here is exactly that guard.
-/// </para>
-/// <para>
-/// <b>These tests mutate process-wide state, and every one of them puts it back.</b> The registry is
-/// static and xUnit runs test classes in parallel, so a page load in another class could be
-/// enumerating <see cref="JsEngineRegistry.All"/> while these run. Two rules keep that safe and are
-/// worth stating because breaking either is a flake rather than a failure: nothing here calls
-/// <see cref="JsEngineRegistry.Reset"/>, which would unregister the real engine and leave a
-/// concurrent <c>DomBridge</c> with no provider to adopt its context; and the substitute registered
-/// below deliberately does not implement <see cref="IJsRealmAdoption"/>, so a concurrent adoption
-/// that is offered it simply moves on to the next provider. Every write to the selection environment
-/// variable also lives in this class, so the writes are serialised with each other by xUnit's
-/// per-class collection.
-/// </para>
-/// </summary>
+/// <summary>Read-only checks of the process registry, and isolated tests of its shared implementation.</summary>
 public class JsealRegistryTests
 {
-    /// <remarks>
-    /// The same explicit registration the conformance suite performs, and for the same reason: this
-    /// class names no engine type either, so nothing else would load the provider assembly whose
-    /// module initializer registers it.
-    /// </remarks>
     static JsealRegistryTests() => BroilerJsEngineProvider.Register();
 
-    /// <summary>
-    /// A provider that exists only to be looked up.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="CreateRealm"/> throws rather than returning something inert: nothing in these
-    /// tests builds a realm from it, and a substitute that silently answered a realm request would
-    /// be a way for a mistake to look like a pass. It implements no
-    /// <see cref="IJsRealmAdoption"/>, which is what keeps it harmless to a page load running in
-    /// another test class while it is registered.
-    /// </remarks>
-    private sealed class SubstituteProvider(string name, JsCapabilities capabilities = JsCapabilities.None)
-        : IJsEngineProvider
+    private sealed class SubstituteProvider(string name) : IJsEngineProvider
     {
         public string Name => name;
-
-        public string Description => "A test substitute; it builds no realms.";
-
-        public JsCapabilities Capabilities => capabilities;
-
-        public IJsRealm CreateRealm(JsRealmOptions options) =>
-            throw new NotSupportedException("The substitute provider does not build realms.");
+        public string Description => "Registry test provider";
+        public JsCapabilities Capabilities => JsCapabilities.None;
+        public IJsRealm CreateRealm(JsRealmOptions options) => throw new NotSupportedException();
     }
-
-    /// <summary>A name no real engine will ever take, so a leaked registration is obvious.</summary>
-    private static string UniqueName([System.Runtime.CompilerServices.CallerMemberName] string caller = "") =>
-        $"test-substitute-{caller.ToLowerInvariant()}";
 
     [Fact]
     public void ThisBuildHasAnEngineForTheConformanceSuiteToRun()
     {
-        // Without this, JsealConformanceTests would enumerate nothing, every theory in it would be
-        // skipped for want of data, and the suite would report green having asserted nothing.
         Assert.True(JsEngineRegistry.HasAny);
         Assert.NotEmpty(JsEngineRegistry.All);
         Assert.NotEmpty(JsealConformanceTests.Engines);
@@ -77,187 +29,207 @@ public class JsealRegistryTests
         foreach (var provider in JsEngineRegistry.All)
         {
             Assert.Same(provider, JsEngineRegistry.Find(provider.Name));
-
-            // The name is what a configuration or an environment variable spells, so it has to be a
-            // stable identifier rather than a display string.
+            Assert.Same(provider, JsEngineRegistry.Find(provider.Name.ToUpperInvariant()));
             Assert.Equal(provider.Name.Trim(), provider.Name);
             Assert.Equal(provider.Name.ToLowerInvariant(), provider.Name);
         }
+        Assert.Null(JsEngineRegistry.Find("no-such-engine"));
     }
 
     [Fact]
     public void TheDefaultProviderIsOneOfTheRegisteredOnes()
     {
         var chosen = JsEngineRegistry.Default;
-
         Assert.Same(chosen, JsEngineRegistry.Find(chosen.Name));
         Assert.Contains(chosen, JsEngineRegistry.All);
     }
 
     [Fact]
-    public void FindAnswersNullForANameNobodyRegistered()
-    {
-        Assert.Null(JsEngineRegistry.Find("no-such-engine"));
-    }
-
-    [Fact]
     public void RegisteringAProviderMakesItFindableAndUnregisteringRemovesIt()
     {
-        var name = UniqueName();
-        var provider = new SubstituteProvider(name, JsCapabilities.HostScriptSource);
-
-        try
-        {
-            JsEngineRegistry.Register(provider);
-
-            Assert.Same(provider, JsEngineRegistry.Find(name));
-            Assert.Contains(provider, JsEngineRegistry.All);
-
-            // Names are matched case-insensitively, because the thing that spells one is a human
-            // editing a configuration file or an environment variable.
-            Assert.Same(provider, JsEngineRegistry.Find(name.ToUpperInvariant()));
-        }
-        finally
-        {
-            Assert.True(JsEngineRegistry.Unregister(name));
-        }
-
-        Assert.Null(JsEngineRegistry.Find(name));
-        Assert.DoesNotContain(provider, JsEngineRegistry.All);
-
-        // Unregistering what is not there answers false rather than throwing: a teardown that runs
-        // twice is not a failure.
-        Assert.False(JsEngineRegistry.Unregister(name));
+        var registry = new JsEngineRegistryState();
+        var provider = new SubstituteProvider("alpha");
+        registry.Register(provider);
+        Assert.True(registry.HasAny);
+        Assert.Same(provider, registry.Find("ALPHA"));
+        Assert.Same(provider, registry.GetDefault());
+        Assert.Same(provider, Assert.Single(registry.All));
+        Assert.True(registry.Unregister("ALPHA"));
+        Assert.Null(registry.Find("alpha"));
+        Assert.Empty(registry.All);
+        Assert.False(registry.HasAny);
+        Assert.False(registry.Unregister("alpha"));
     }
 
     [Fact]
-    public void RegisteringTheSameNameTwiceReplacesTheProvider()
+    public void RegisteringTheSameNameTwiceReplacesTheSelectedProvider()
     {
-        var name = UniqueName();
-        var first = new SubstituteProvider(name);
-        var second = new SubstituteProvider(name, JsCapabilities.Promises);
-
-        try
-        {
-            JsEngineRegistry.Register(first);
-            JsEngineRegistry.Register(second);
-
-            // Replacement is what a suite that substitutes a recording provider needs, and it is why
-            // the registry is keyed by name rather than appended to.
-            Assert.Same(second, JsEngineRegistry.Find(name));
-            Assert.Equal(JsCapabilities.Promises, JsEngineRegistry.Find(name)!.Capabilities);
-            Assert.Single(JsEngineRegistry.All.Where(p => p.Name == name));
-        }
-        finally
-        {
-            JsEngineRegistry.Unregister(name);
-        }
+        var registry = new JsEngineRegistryState();
+        var first = new SubstituteProvider("beta");
+        var other = new SubstituteProvider("alpha");
+        var replacement = new SubstituteProvider("BETA");
+        registry.Register(first);
+        registry.Register(other);
+        registry.SetDefault("BeTa");
+        registry.Register(replacement);
+        Assert.Equal(2, registry.All.Count);
+        Assert.Same(replacement, registry.Find("beta"));
+        Assert.Same(replacement, registry.GetDefault());
+        Assert.Same(replacement, registry.GetDefault(" beta "));
+        Assert.True(registry.Unregister("beta"));
+        Assert.Same(other, registry.GetDefault());
     }
 
     [Fact]
-    public void SetDefaultRefusesANameNobodyRegistered()
+    public void RemovingTheDefaultChoosesTheFirstRemainingNameAndEventuallyBecomesEmpty()
     {
-        var before = JsEngineRegistry.Default;
-
-        // A typo in a configuration should be loud rather than silently served by whichever engine
-        // happened to register first â€” which is the failure mode the argument check exists to stop.
-        var refusal = Assert.Throws<ArgumentException>(() => JsEngineRegistry.SetDefault("no-such-engine"));
-        Assert.Equal("name", refusal.ParamName);
-
-        Assert.Same(before, JsEngineRegistry.Default);
+        var registry = new JsEngineRegistryState();
+        var zulu = new SubstituteProvider("zulu");
+        var beta = new SubstituteProvider("Beta");
+        var alpha = new SubstituteProvider("alpha");
+        registry.Register(zulu);
+        registry.Register(beta);
+        registry.Register(alpha);
+        Assert.Same(zulu, registry.GetDefault()); // First registration, not alphabetical selection.
+        registry.SetDefault("ZULU");
+        Assert.True(registry.Unregister("zulu"));
+        Assert.Same(alpha, registry.GetDefault());
+        Assert.True(registry.Unregister("alpha"));
+        Assert.Same(beta, registry.GetDefault());
+        Assert.False(registry.Unregister("missing"));
+        Assert.Same(beta, registry.GetDefault());
+        Assert.True(registry.Unregister("BETA"));
+        Assert.False(registry.HasAny);
+        Assert.Empty(registry.All);
+        var failure = Assert.Throws<InvalidOperationException>(() => registry.GetDefault());
+        Assert.StartsWith("No JavaScript engine provider is registered.", failure.Message);
+        Assert.Throws<InvalidOperationException>(() => registry.GetDefault("zulu"));
+        registry.Register(alpha);
+        Assert.Same(alpha, registry.GetDefault());
     }
 
     [Fact]
-    public void SetDefaultChoosesAmongTheRegisteredProviders()
+    public void RemovingAnotherProviderPreservesTheExplicitDefault()
     {
-        var name = UniqueName();
-        var provider = new SubstituteProvider(name);
-        var previousSelection = Environment.GetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable);
-        Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, null);
-
-        var previousDefault = JsEngineRegistry.Default.Name;
-
-        try
-        {
-            JsEngineRegistry.Register(provider);
-            JsEngineRegistry.SetDefault(name);
-
-            Assert.Same(provider, JsEngineRegistry.Default);
-        }
-        finally
-        {
-            JsEngineRegistry.SetDefault(previousDefault);
-            JsEngineRegistry.Unregister(name);
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, previousSelection);
-        }
-
-        Assert.Equal(previousDefault, JsEngineRegistry.Default.Name);
+        var registry = new JsEngineRegistryState();
+        var first = new SubstituteProvider("alpha");
+        var selected = new SubstituteProvider("zulu");
+        registry.Register(first);
+        registry.Register(selected);
+        registry.SetDefault("zulu");
+        Assert.True(registry.Unregister("alpha"));
+        Assert.Same(selected, registry.GetDefault());
     }
 
     [Fact]
-    public void TheEnvironmentVariableOverridesTheDefaultAndAnUnknownOneDoesNot()
+    public void SetDefaultRefusesAnUnknownNameWithoutChangingSelection()
     {
-        var name = UniqueName();
-        var provider = new SubstituteProvider(name);
-        var previousSelection = Environment.GetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable);
+        var registry = new JsEngineRegistryState();
+        var provider = new SubstituteProvider("alpha");
+        registry.Register(provider);
+        var failure = Assert.Throws<ArgumentException>(() => registry.SetDefault("missing"));
+        Assert.Equal("name", failure.ParamName);
+        Assert.Same(provider, registry.GetDefault());
+    }
 
-        try
+    [Fact]
+    public void EnvironmentSelectionIsReadPerCallAndDoesNotChangeTheRegisteredDefault()
+    {
+        var registry = new JsEngineRegistryState();
+        var first = new SubstituteProvider("alpha");
+        var selected = new SubstituteProvider("beta");
+        registry.Register(first);
+        registry.Register(selected);
+        // Supply the per-call environment value without mutating this test process's environment.
+        Assert.Same(selected, registry.GetDefault("  BeTa  "));
+        foreach (var selection in new[] { null, "", "   ", "missing" })
+            Assert.Same(first, registry.GetDefault(selection));
+        Assert.True(registry.Unregister("beta"));
+        Assert.Same(first, registry.GetDefault("beta"));
+        registry.Register(selected);
+        Assert.Same(selected, registry.GetDefault("beta"));
+        Assert.Same(first, registry.GetDefault());
+    }
+
+    [Fact]
+    public void ResetClearsRegistrationsAndSelectionAndSnapshotsRemainStable()
+    {
+        var registry = new JsEngineRegistryState();
+        var first = new SubstituteProvider("alpha");
+        var second = new SubstituteProvider("beta");
+        registry.Register(first);
+        registry.Register(second);
+        registry.SetDefault("beta");
+        var snapshot = registry.All;
+        registry.Reset();
+        registry.Reset();
+        Assert.False(registry.HasAny);
+        Assert.Empty(registry.All);
+        Assert.Null(registry.Find("beta"));
+        Assert.Throws<InvalidOperationException>(() => registry.GetDefault("beta"));
+        Assert.Equal(2, snapshot.Count);
+        Assert.Contains(first, snapshot);
+        Assert.Contains(second, snapshot);
+        registry.Register(first);
+        Assert.Same(first, registry.GetDefault("beta"));
+    }
+
+    [Fact]
+    public async Task DefaultReadsStayValidWhileTheSelectedProviderIsRemovedAndReplaced()
+    {
+        var registry = new JsEngineRegistryState();
+        var permanent = new SubstituteProvider("beta");
+        var transient = new SubstituteProvider("alpha");
+        var replacement = new SubstituteProvider("ALPHA");
+        registry.Register(permanent);
+        using var start = new Barrier(2);
+        var writer = Task.Run(() =>
         {
-            JsEngineRegistry.Register(provider);
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, null);
-            var registeredDefault = JsEngineRegistry.Default;
-
-            // "Does this page render differently on the other engine?" is a question about a run,
-            // which is why the selection is read per call rather than captured at registration.
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, name);
-            Assert.Same(provider, JsEngineRegistry.Default);
-
-            // Surrounding whitespace is trimmed, because an environment variable set from a shell
-            // script picks it up more often than not.
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, $"  {name}  ");
-            Assert.Same(provider, JsEngineRegistry.Default);
-
-            // A name nobody registered falls back to the registered default rather than throwing:
-            // the variable selects among the engines this build linked, and one it did not link is
-            // not a reason to refuse to load a page.
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, "no-such-engine");
-            Assert.Same(registeredDefault, JsEngineRegistry.Default);
-
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, "   ");
-            Assert.Same(registeredDefault, JsEngineRegistry.Default);
-        }
-        finally
+            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10)));
+            for (var i = 0; i < 2_000; i++)
+            {
+                registry.Register(transient);
+                registry.SetDefault("alpha");
+                registry.Register(replacement);
+                Assert.True(registry.Unregister("alpha"));
+                Assert.Same(permanent, registry.GetDefault());
+            }
+        });
+        var reader = Task.Run(() =>
         {
-            Environment.SetEnvironmentVariable(JsEngineRegistry.SelectionEnvironmentVariable, previousSelection);
-            JsEngineRegistry.Unregister(name);
-        }
+            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10)));
+            for (var i = 0; i < 4_000; i++)
+            {
+                var selected = registry.GetDefault(i % 2 == 0 ? "alpha" : null);
+                Assert.True(ReferenceEquals(selected, permanent) || ReferenceEquals(selected, transient) || ReferenceEquals(selected, replacement));
+                Assert.True(registry.HasAny);
+                Assert.Contains(permanent, registry.All);
+                Assert.Same(permanent, registry.Find("beta"));
+            }
+        });
+        await Task.WhenAll(writer, reader).WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.Same(permanent, registry.GetDefault());
     }
 
     [Fact]
     public void RegisteringNothingIsRefusedRatherThanRecorded()
     {
-        Assert.Throws<ArgumentNullException>(() => JsEngineRegistry.Register(null!));
+        var registry = new JsEngineRegistryState();
+        Assert.Throws<ArgumentNullException>(() => registry.Register(null!));
+        Assert.False(registry.HasAny);
     }
 
     [Fact]
     public void AProviderThatCannotAdoptAForeignRealmSaysSo()
     {
-        // The bridge offers the context the host built to every registered provider in turn, so the
-        // type test in TryAdopt is what makes that safe: a provider must answer false for an object
-        // that is not its engine's rather than wrap something it cannot drive.
         var adopters = JsEngineRegistry.All.OfType<IJsRealmAdoption>().ToArray();
         Assert.NotEmpty(adopters);
-
         foreach (var adopter in adopters)
         {
-            // The options are immaterial to the type test and are passed as the default, which is
-            // also the shape a caller uses when it has no policy to impose.
             Assert.False(adopter.TryAdopt(new object(), JsRealmOptions.Default, out var realm));
             Assert.Null(realm);
-
             Assert.False(adopter.TryAdopt("not a realm", JsRealmOptions.Default, out realm));
             Assert.Null(realm);
         }
     }
 }
-

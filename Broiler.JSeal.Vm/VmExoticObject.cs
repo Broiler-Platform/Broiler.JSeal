@@ -7,11 +7,9 @@ namespace Broiler.JSeal.Vm;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This is a translation and deliberately not a policy.</b> The ordering rule that matters -
-/// ordinary properties beat named ones, and a handler is asked only about what storage did not hold
-/// - lives in the engine, where the property lookup is, and the VM's own exotic object enforces it.
-/// Re-implementing it here would put the rule in two places, and the copy that drifts is the one
-/// nobody is looking at.
+/// The VM checks ordinary own storage before asking this adapter. JSEAL also gives inherited
+/// properties precedence over named handler values, so the adapter declines names present on the
+/// prototype chain. The engine then reads that property with the original receiver.
 /// </para>
 /// <para>
 /// <b>The two contracts differ in one respect and it is worth naming.</b> JSEAL's
@@ -27,9 +25,19 @@ internal sealed class VmExoticObject : IJsHostExotic
 
     internal VmExoticObject(IJsExotic handler) => _handler = handler;
 
+    // Attached immediately after creation, before the object is exposed to callers.
+    internal JsHostValue Target { get; set; }
+
     /// <inheritdoc />
     public bool TryGetNamed(JsHostRealm realm, string name, out JsHostValue value)
     {
+        var prototype = realm.GetPrototype(Target);
+        if (prototype.IsObject && realm.HasProperty(prototype, name))
+        {
+            value = JsHostValue.Missing;
+            return false;
+        }
+
         if (!_handler.TryGetNamed(name, out var answered))
         {
             value = JsHostValue.Missing;
@@ -43,11 +51,14 @@ internal sealed class VmExoticObject : IJsHostExotic
     /// <inheritdoc />
     public bool TryGetIndex(JsHostRealm realm, uint index, out JsHostValue value)
     {
-        if (!_handler.TryGetIndex(index, out var answered))
+        var length = _handler.IndexedLength;
+        if (index >= length)
         {
             value = JsHostValue.Missing;
             return false;
         }
+        if (!_handler.TryGetIndex(index, out var answered))
+            throw new InvalidOperationException($"IJsExotic must supply index {index} below IndexedLength ({length}).");
 
         value = VmMarshal.Unwrap(answered);
         return true;
@@ -62,6 +73,15 @@ internal sealed class VmExoticObject : IJsHostExotic
         _handler.SupportedNames;
 
     /// <inheritdoc />
-    public uint IndexedLength(JsHostRealm realm) => _handler.IndexedLength;
+    public uint IndexedLength(JsHostRealm realm)
+    {
+        var length = _handler.IndexedLength;
+        for (uint index = 0; index < length; index++)
+        {
+            if (!_handler.TryGetIndex(index, out _))
+                throw new InvalidOperationException($"IJsExotic must supply index {index} below IndexedLength ({length}).");
+        }
+        return length;
+    }
 }
 

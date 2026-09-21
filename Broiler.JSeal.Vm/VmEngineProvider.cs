@@ -7,36 +7,12 @@ using Broiler.VM.Profile.JavaScript.Compiler;
 
 namespace Broiler.JSeal.Vm;
 
-/// <summary>
-/// The Broiler.VM JavaScript profile, as an engine the browser can choose.
-/// </summary>
+/// <summary>The Broiler.VM JavaScript profile behind the JSEAL realm contracts.</summary>
 /// <remarks>
-/// <para>
-/// <b>What it declares now covers <see cref="JsCapabilities.Document"/>.</b> The profile's host
-/// surface can mint objects, install members and accessors, call back into the guest synchronously,
-/// and complete a lookup for an object whose members are not a fixed list - which is most of what
-/// binding a document needs. <see cref="JsCapabilities.Promises"/> was believed to need a seam the
-/// profile does not have, and did not: a promise a host settles is built out of the realm's own
-/// <c>Promise</c> through <c>Construct</c>, which is three ordinary crossings and no evaluation. See
-/// <c>VmRealm.Jobs.cs</c>, which records the argument it replaced. (This used to call
-/// <c>Promises</c> the last bit to arrive; <c>BinaryData</c> and <c>ClassicScriptSource</c> joined
-/// <c>Document</c> after it.)
-/// </para>
-/// <para>
-/// <b>Declaring <c>Document</c> is a claim about this realm and not about the browser.</b> It says
-/// a host may build a document-bearing page in a realm this provider made; it does not say the
-/// bridge does so, and today it does not - <c>IDomBridgeRuntime.Attach</c> takes a Broiler.JS
-/// context, so the page a browser loads still adopts a realm of the other engine. The gap between
-/// those two sentences is the migration's, not this provider's, and <c>docs/jseal.md</c> is where
-/// it is tracked.
-/// </para>
-/// <para>
-/// <b>Every realm is its own runtime, artifact and instance, and that is the profile's shape rather
-/// than a choice made here.</b> A Broiler.VM realm belongs to an instance, an instance to a
-/// verified artifact, and an artifact to a runtime whose capability table was fixed when it was
-/// created - so a realm built with a different content policy is a different runtime, and there is
-/// no lighter object to make one out of.
-/// </para>
+/// Each created realm owns a runtime, verified bootstrap artifact and instance. The provider uses
+/// the profile's in-realm host surface for objects, callbacks and guest calls. It declares Document
+/// capabilities, but that declaration is not evidence that an external browser uses it for page loads.
+/// Host integration is tracked separately in docs/roadmap.integration.md.
 /// </remarks>
 public sealed class VmEngineProvider : IJsEngineProvider
 {
@@ -50,35 +26,11 @@ public sealed class VmEngineProvider : IJsEngineProvider
     public string Description =>
         "The Broiler.VM JavaScript profile, bound through its in-realm host surface.";
 
-    /// <inheritdoc />
+    /// <summary>The capabilities available before realm-specific narrowing.</summary>
     /// <remarks>
-    /// <para>
-    /// <see cref="JsCapabilities.ReentrantHostCalls"/> is declarable because a host object's method
-    /// is an ordinary function in the realm: calling a guest listener from inside one is the
-    /// interpreter's own call path and reaches no lifecycle gate.
-    /// <see cref="JsCapabilities.GlobalIsVariableScope"/> is declarable because a top-level
-    /// <c>var</c> on this engine becomes an own property of the global object, which was measured
-    /// rather than assumed.
-    /// </para>
-    /// <para>
-    /// <see cref="JsCapabilities.Promises"/> is declarable because the realm's own <c>Promise</c>
-    /// constructor is reachable through the host surface and its executor runs synchronously, so
-    /// the resolving pair a host settles from outside the guest is the pair the language made.
-    /// </para>
-    /// <para>
-    /// <see cref="JsCapabilities.WorkerRealms"/>, <see cref="JsCapabilities.Modules"/> and
-    /// <see cref="JsCapabilities.DynamicImport"/> are absent, and each absence is a member of this
-    /// provider that refuses rather than a member that misbehaves. The first waits on a second realm
-    /// and a structured clone the profile does not have; the other two wait on a module-graph
-    /// contract JSEAL has not designed, which is a gap on the contract's side rather than this one's.
-    /// </para>
-    /// <para>
-    /// <b>Apart from <see cref="JsCapabilities.GuestEval"/>, which a realm built with
-    /// <c>AllowGuestEval</c> false does not get, the seven that remain are exactly
-    /// <see cref="JsCapabilities.Document"/>.</b> That is worth stating as an identity rather than
-    /// leaving a reader to add the flags up, because it is the line a host branches on before it
-    /// decides whether to load a page here.
-    /// </para>
+    /// The provider declares Document plus GuestEval. Creation removes GuestEval when disallowed and
+    /// checks for the required binary and evaluation intrinsics. WorkerRealms, Modules and DynamicImport
+    /// are absent. Cloning refuses WorkerRealms; module execution has no JSEAL contract yet.
     /// </remarks>
     public JsCapabilities Capabilities =>
         JsCapabilities.HostScriptSource |
@@ -116,7 +68,7 @@ public sealed class VmEngineProvider : IJsEngineProvider
             // program is compiled to make one. Nothing in it runs: what matters is that
             // instantiating it is the moment the profile builds a realm and hands it over.
             var compiled = JsCompiler.Compile(
-                [new JsScriptUnit("bootstrap", string.Empty, ParseOptions(options), options.ForceStrictMode, Caller)],
+                [new JsScriptUnit("bootstrap", string.Empty, SliceParseOptions.Script, options.ForceStrictMode, Caller)],
                 [],
                 new JsCompileRequest());
 
@@ -191,9 +143,6 @@ public sealed class VmEngineProvider : IJsEngineProvider
             throw;
         }
     }
-
-    private static SliceParseOptions ParseOptions(JsRealmOptions options) =>
-        SliceParseOptions.Script;
 
     /// <summary>
     /// The runtime this provider builds: the host-surface permission, and a compiler behind

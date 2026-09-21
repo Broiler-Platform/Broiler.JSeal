@@ -1,23 +1,12 @@
 ﻿namespace Broiler.JSeal.Providers;
 
-/// <summary>
-/// The mint side of <see cref="JsValue"/>: how a provider turns one of its engine's values into a
-/// handle the bridge can hold.
-/// </summary>
+/// <summary>The provider-facing factories and storage access for opaque engine handles.</summary>
 /// <remarks>
-/// <para>
-/// This is the one part of JSEAL a binding must never call. It is public rather than internal so that
-/// a provider can be written outside this repository â€” a JSEAL whose only possible implementations are
-/// the two assemblies next to it would be a naming exercise rather than an abstraction â€” and it lives
-/// in its own <c>Providers</c> namespace so that a file which needs it says so in its usings, which is
-/// what <c>scripts/check-engine-neutrality.sh</c> counts.
-/// </para>
-/// <para>
-/// <b>The kind is the provider's answer, given once.</b> A provider knows whether the value it is
-/// wrapping is callable or an Array exotic at the moment it wraps it, and answering then costs
-/// nothing. Asking later â€” <c>JsValue.IsFunction</c> on a handle whose engine is behind a C API â€”
-/// would cost a call across the boundary at each of the bridge's callability tests (59 on 2026-09-08).
-/// </para>
+/// These members are public so providers can be implemented outside this repository. Host bindings
+/// should use JsValue and IJsRealm instead of inspecting engine storage. The Providers namespace
+/// makes that boundary visible in source review; no namespace-ratchet script exists in this checkout.
+/// Providers classify callability and array identity when wrapping a value, so inspecting a handle
+/// does not need another engine crossing.
 /// </remarks>
 public static class JsProviderValue
 {

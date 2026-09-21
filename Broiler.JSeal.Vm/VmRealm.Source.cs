@@ -17,12 +17,11 @@ namespace Broiler.JSeal.Vm;
 /// <para>
 /// <b>What separates them is marked by this provider, not carried by the profile.</b> The
 /// profile's evaluation request is the source text and nothing else, so the artifact provider cannot
-/// tell which kind of evaluation it is answering. <see cref="EvaluateHostScript"/> holds
-/// <see cref="VmSourceProvider.EnterHostScript"/> for the whole evaluation.
-/// <see cref="EvaluateClassicScript"/> holds <see cref="VmSourceProvider.EnterClassicScript"/> for
-/// the whole evaluation as well: it arms a permit the first compile spends, and suspends the
-/// host-script mark until it is disposed. <see cref="EvaluateDynamicSource"/> takes neither, but
-/// it never meets the provider's refusal: a realm built without <c>AllowGuestEval</c> also lacks
+/// tell which kind of evaluation it is answering. Host and classic evaluations each authorize
+/// one compilation through <see cref="VmSourceProvider.EnterScript"/>, immediately before calling
+/// the captured intrinsic inside the realm's step. The permit is consumed before guest code runs.
+/// <see cref="EvaluateDynamicSource"/> grants no permit: a realm built without
+/// <c>AllowGuestEval</c> also lacks
 /// <see cref="JsCapabilities.GuestEval"/>, so the member throws before evaluating, while the page's
 /// own <c>eval</c> in that realm is refused inside it. The reasoning, and the gap it stands in for,
 /// are on <see cref="VmSourceProvider"/>.
@@ -35,40 +34,37 @@ internal sealed partial class VmRealm
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        using var host = _sources.EnterHostScript();
-
-        return Evaluate(source, label);
+        return Evaluate(source, label, VmSourceProvider.SourceKind.Host);
     }
 
     /// <inheritdoc />
     /// <remarks>
     /// <b>The permit is what makes this expressible on an engine with no run-time compiler.</b>
     /// Compiling here means asking a registered artifact provider, and that provider is also where a
-    /// forbidden evaluation is refused -- so handing a page's script over needs a permission that is
-    /// narrower than the host's held mark and wider than nothing. One compile, spent by the compile
-    /// it authorises.
+    /// forbidden evaluation is refused. Handing over a page's script therefore authorizes exactly
+    /// one compilation, just as for host script.
     /// </remarks>
     public JsValue EvaluateClassicScript(string source, string label)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ThrowIfDisposed();
 
         if ((Capabilities & JsCapabilities.ClassicScriptSource) == 0)
             throw Lacking(JsCapabilities.ClassicScriptSource);
 
-        using var permit = _sources.EnterClassicScript();
-
-        return Evaluate(source, label);
+        return Evaluate(source, label, VmSourceProvider.SourceKind.Classic);
     }
 
     /// <inheritdoc />
     public JsValue EvaluateDynamicSource(string source, string label)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ThrowIfDisposed();
 
         if ((Capabilities & JsCapabilities.GuestEval) == 0)
             throw Lacking(JsCapabilities.GuestEval);
 
-        return Evaluate(source, label);
+        return Evaluate(source, label, VmSourceProvider.SourceKind.Guest);
     }
 
     /// <summary>
@@ -83,13 +79,13 @@ internal sealed partial class VmRealm
     /// <para>
     /// <b>The intrinsic, captured at realm creation, and NOT read off the global here.</b> <c>eval</c>
     /// is a writable global, so reading it at this line invoked whatever the page had assigned over
-    /// it - which intercepted the bridge's own script and, because the host-script mark is held
-    /// across this call, lent the page a compiler its Content-Security-Policy had taken away. See
+    /// it - which could intercept the bridge's own script and spend the pending permit on the
+    /// page's own source. Capturing it ensures the authorized compile is requested first. See
     /// <c>VmHostBridge.Eval</c> for the measurement, and
     /// <c>APageThatReplacesEvalCannotBorrowTheHostsPermissionToCompile</c> for the case.
     /// </para>
     /// </remarks>
-    private JsValue Evaluate(string source, string label) =>
+    private JsValue Evaluate(string source, string label, VmSourceProvider.SourceKind kind) =>
         InStep(realm =>
         {
             var evaluate = _bridge.Eval;
@@ -102,6 +98,7 @@ internal sealed partial class VmRealm
 
             JsHostValue[] arguments = [JsHostValue.String(source)];
 
+            using var permit = _sources.EnterScript(kind);
             return VmMarshal.Wrap(realm.Invoke(evaluate, JsHostValue.Undefined, arguments));
         });
 }
