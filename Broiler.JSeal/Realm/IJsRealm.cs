@@ -27,7 +27,7 @@
 /// </remarks>
 public interface IJsRealm : IJsValues, IJsMembers, IJsCalls, IJsJobs, IJsSource, IJsClone, IDisposable
 {
-    /// <summary>The global object â€” <c>globalThis</c>.</summary>
+    /// <summary>The global object — <c>globalThis</c>.</summary>
     JsValue Global { get; }
 
     /// <summary>What this realm's engine can do. Fixed for the life of the realm.</summary>

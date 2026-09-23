@@ -198,10 +198,10 @@ try {
         }
         $null = $nugetConfig.configuration.packageSourceMapping.AppendChild($candidateMapping)
         # The copy restores into a fresh cache, so every package the checkout already resolved would be
-        # fetched again - the Broiler.* engines from an authenticated feed. Stage those archives from the
-        # checkout's own restores instead, hash-checked, and map each by exact id to that local source:
-        # everything outside the candidate families then restores byte-identical to the pinned build,
-        # with no credentials. Only a package the candidate newly introduces uses the normal sources.
+        # fetched again. Stage those archives from the checkout's own restores instead, hash-checked,
+        # and map each by exact id to that local source: everything outside the candidate families then
+        # restores byte-identical to the pinned build, with no network access for them. Only a package
+        # the candidate newly introduces uses the normal sources.
         $pinnedFeed = Join-Path $workspace 'pinned-archives'
         New-Item -ItemType Directory -Path $pinnedFeed | Out-Null
         $candidatePatterns = @($candidateInfo.patterns) + @($candidateArchives | ForEach-Object { $_.id })

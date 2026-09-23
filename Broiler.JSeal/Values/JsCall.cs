@@ -24,7 +24,7 @@ public readonly ref struct JsCall
     /// <summary>The realm this call is running in. Never <see langword="null"/>.</summary>
     public IJsRealm Realm { get; }
 
-    /// <summary>The receiver â€” <c>this</c> inside the called function.</summary>
+    /// <summary>The receiver — <c>this</c> inside the called function.</summary>
     public JsValue This { get; }
 
     /// <summary>The construction target, or Missing for an ordinary call.</summary>

@@ -63,9 +63,10 @@ compiles; that body answers `==` wherever `==` is `===` and throws `NotSupported
 distinct BigInt handles. A BigInt handle another engine minted is refused with `JsEngineException` by
 every member that would unwrap it (Broiler.JS used to raise an `InvalidCastException`). Values cross
 exactly both ways: as a property, as a callback argument or result, through `Invoke`, and through a
-same-realm `Clone`. Broiler.VM has BigInt from the release that carries its B05-B08 work (host value
-kind `JsHostValueKind.BigInt`); on the pinned `0.1.0-preview.3` it has none and refuses a BigInt
-literal. [JsealConformanceTests.BigInt.cs](../Broiler.JSeal.Tests/JsealConformanceTests.BigInt.cs)
+same-realm `Clone`. Broiler.VM has BigInt from `0.1.0-preview.4`, the pinned release, which carries
+its B05-B08 work (host value kind `JsHostValueKind.BigInt`); the VM provider boxes the exact integer
+in the handle, answers `ToBoolean` and `IsStrictlyEqual` from it, and refuses another engine's
+BigInt handle. [JsealConformanceTests.BigInt.cs](../Broiler.JSeal.Tests/JsealConformanceTests.BigInt.cs)
 holds the shared cases, driven by a stated per-engine table of the BigInt value, `BigInt64Array`/
 `BigUint64Array` and the DataView BigInt accessors.
 
@@ -248,13 +249,13 @@ external browser. Flag values are public contract and are pinned by a test; a ne
 
 | Capability | Broiler.JS | Broiler.VM |
 | --- | --- | --- |
-| HostScriptSource, ClassicScriptSource | Yes | Yes; creation checks eval availability |
+| HostScriptSource, ClassicScriptSource | Yes | Yes; through `JsHostRealm.EvaluateScript` |
 | GuestEval | Unless disabled by options | Unless disabled by options; needs eval |
 | Promises, ExoticObjects | Yes | Yes |
 | GlobalIsVariableScope, ReentrantHostCalls | Yes | Yes |
 | BinaryData | Yes; SharedArrayBuffer excluded from byte reads | Yes; creation checks binary intrinsics |
-| StructuredClone | Yes | No; the profile's carrier arrives with the next VM pin (I18) |
-| WorkerRealms | Yes, including structured clone transfer | No |
+| StructuredClone | Yes | Yes (I18); creation checks one clone at handover |
+| WorkerRealms | Yes, including structured clone transfer | No; a transfer carrier is single-use (I18) |
 | Modules, DynamicImport | Only when ModuleSupport returns true | No |
 
 The [JS provider](../Broiler.JSeal.BroilerJs/BroilerJsEngineProvider.cs) treats a missing, false or
@@ -287,7 +288,7 @@ accounts for every single flag, for every registered provider:
   `AnUndeclaredCapabilityIsAnExplicitRefusalNotAPass`. That row asserts the realm lacks the flag and
   calls the gated member, which must throw JsCapabilityUnavailableException, the contract's documented
   rule and nothing more. Test reports therefore list each refusal by provider and flag. A refusal is
-  never counted as a witness. Only the WorkerRealms and StructuredClone refusals (broiler-vm) run
+  never counted as a witness. Only the WorkerRealms refusal (broiler-vm) runs
   today; the other specified refusals are checked only for existence until a provider without the
   flag is registered.
 - **Absence only.** GlobalIsVariableScope and ReentrantHostCalls gate no member, and the contract does
@@ -312,8 +313,8 @@ unrelated one is still witnessed. They also check that every provider/flag pair 
 refused, absent-only or a recorded gap, exactly once. A removed
 witness, a renamed witness or a provider dropped from witness rows fails the suite. In Release-VM,
 the suite checks registered identities rather than a count: both broiler-js and broiler-vm run the
-Document witnesses; broiler-js witnesses WorkerRealms and StructuredClone; broiler-vm reports two
-refusals. Release registers only broiler-js. These checks inventory capability claims. They do not
+Document witnesses and StructuredClone; broiler-js witnesses WorkerRealms; broiler-vm reports one
+refusal, WorkerRealms. Release registers only broiler-js. These checks inventory capability claims. They do not
 prove complete engine semantics.
 
 **Same-realm structured clone (StructuredClone, I18).** J18 decided that same-realm cloning needs its
@@ -325,14 +326,18 @@ narrower. The shared cases in
 [JsealConformanceTests.StructuredClone.cs](../Broiler.JSeal.Tests/JsealConformanceTests.StructuredClone.cs)
 cover cycles, the brands the engines support, uncloneable values, holes, accessors, primitive
 wrappers and array properties, transfer failure atomicity, source detachment and destination-realm
-ownership. The VM provider declares neither flag on its pinned packages.
+ownership. The VM provider declares StructuredClone since its `0.1.0-preview.4` pin, over the
+profile's own carrier (`JsHostRealm.DetachClone`/`AdoptClone`), and passes every shared case with no
+gap. It does not declare WorkerRealms: the profile makes a carrier holding transferred bytes
+single-use, which contradicts `IJsClone.Adopt`'s promise of repeatable adoption, so its `Detach` and
+`Adopt` run only behind an internal test gate.
 
 The flag says that `Clone` works and that a refused value fails with `JsEngineException`; it does not
 certify that a provider's engine answers every value as HTML's StructuredSerialize does. The known
 deviations of the declaring provider, each pinned by a recorded gap in the shared cases so that a fix
 fails the suite until the gap is removed:
 
-| Value | HTML | Broiler.JS 0.1.0-preview.1 |
+| Value | HTML | Broiler.JS 0.1.0-preview.3 |
 | --- | --- | --- |
 | Symbol, WeakMap, WeakSet, Proxy, Promise | DataCloneError | Symbol returned as is; the others copied as plain objects |
 | RangeError and the other native error types | Name kept | Rebuilt as `Error` |

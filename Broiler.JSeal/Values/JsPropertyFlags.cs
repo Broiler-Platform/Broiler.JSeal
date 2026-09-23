@@ -13,7 +13,7 @@
 /// </para>
 /// <para>
 /// So this enum carries the three WebIDL-relevant bits and nothing else. The value/accessor
-/// distinction is <b>not</b> a flag here â€” it is which method you call, <see cref="IJsMembers.DefineValue"/>
+/// distinction is <b>not</b> a flag here — it is which method you call, <see cref="IJsMembers.DefineValue"/>
 /// or <see cref="IJsMembers.DefineAccessor"/>. Encoding it as a flag is what let the two disagree in the
 /// first place: a value installed with the accessor bit set, or the reverse, is a mistake the
 /// compiler cannot catch, and an engine whose property storage separates the two (most do) has to
@@ -26,7 +26,7 @@ public enum JsPropertyFlags : byte
     /// <summary>Not enumerable, not configurable, not writable.</summary>
     None = 0,
 
-    /// <summary>Appears in <c>forâ€¦in</c> and <c>Object.keys</c>.</summary>
+    /// <summary>Appears in <c>for…in</c> and <c>Object.keys</c>.</summary>
     Enumerable = 1,
 
     /// <summary>May be redefined or deleted.</summary>
@@ -39,13 +39,13 @@ public enum JsPropertyFlags : byte
     Writable = 4,
 
     /// <summary>
-    /// What almost every DOM member is: enumerable, configurable, and â€” for a value property â€”
+    /// What almost every DOM member is: enumerable, configurable, and — for a value property —
     /// writable. This is the WebIDL default for an operation or an attribute on an interface.
     /// </summary>
     Default = Enumerable | Configurable | Writable,
 
     /// <summary>
-    /// Configurable but not enumerable â€” what <c>Storage</c>'s five methods, its <c>length</c>, and
+    /// Configurable but not enumerable — what <c>Storage</c>'s five methods, its <c>length</c>, and
     /// <c>PerformanceObserver.prototype</c> use, and the only other combination the bridge needs.
     /// </summary>
     NonEnumerable = Configurable | Writable,

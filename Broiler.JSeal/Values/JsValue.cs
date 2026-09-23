@@ -103,7 +103,7 @@ public readonly struct JsValue : IEquatable<JsValue>
     public static JsValue String(string? value) =>
         value is null ? Null : new(JsValueKind.String, 0d, value);
 
-    /// <summary>Whether this is <see cref="Missing"/> â€” no value supplied.</summary>
+    /// <summary>Whether this is <see cref="Missing"/> — no value supplied.</summary>
     public bool IsMissing => _kind == JsValueKind.Missing;
 
     /// <summary>Whether this is <c>undefined</c>. <see cref="Missing"/> is <b>not</b> undefined; see <see cref="IsNullish"/>.</summary>
@@ -113,7 +113,7 @@ public readonly struct JsValue : IEquatable<JsValue>
     public bool IsNull => _kind == JsValueKind.Null;
 
     /// <summary>
-    /// Whether this is <c>null</c>, <c>undefined</c>, or absent â€” the question the bridge's 21
+    /// Whether this is <c>null</c>, <c>undefined</c>, or absent — the question the bridge's 21
     /// <c>IsNullOrUndefined</c> sites were asking on 2026-09-08, each reached from an argument that
     /// may not have been passed at all. None of those calls is left in the bridge.
     /// </summary>
@@ -139,7 +139,7 @@ public readonly struct JsValue : IEquatable<JsValue>
 
     /// <summary>
     /// This value as a number, without calling into the engine: a number is itself, a boolean is 1 or
-    /// 0, and everything else â€” including a string â€” is <see cref="double.NaN"/>.
+    /// 0, and everything else — including a string — is <see cref="double.NaN"/>.
     /// </summary>
     /// <remarks>
     /// This is <b>not</b> ToNumber. A string that looks like a number answers NaN here, because
@@ -182,7 +182,7 @@ public readonly struct JsValue : IEquatable<JsValue>
     /// <remarks>
     /// An object renders as <c>[object]</c> rather than running its <c>toString</c>, because a
     /// <c>ToString()</c> override that can execute page script, throw, or re-enter the realm is a trap
-    /// â€” and the bridge's 343 <c>ToString()</c> calls were exactly that. Anything that needs the real
+    /// — and the bridge's 343 <c>ToString()</c> calls were exactly that. Anything that needs the real
     /// ECMAScript conversion must ask the realm.
     /// </remarks>
     public override string ToString() => _kind switch
@@ -238,7 +238,7 @@ public readonly struct JsValue : IEquatable<JsValue>
     /// <remarks>
     /// This differs from <c>===</c> on NaN alone: <c>NaN.Equals(NaN)</c> is <see langword="true"/> here
     /// and <c>NaN === NaN</c> is <see langword="false"/>. That is the same split
-    /// <see cref="double"/> itself makes, and for the same reason â€” a value that is not equal to
+    /// <see cref="double"/> itself makes, and for the same reason — a value that is not equal to
     /// itself cannot be found in the collection it was put into. The bridge stores JS values in
     /// <c>List&lt;&gt;</c>s (event listeners, collection contents) and the BCL reaches
     /// <see cref="Equals(object)"/> and <see cref="GetHashCode"/> when it searches them, so both have
@@ -270,7 +270,7 @@ public readonly struct JsValue : IEquatable<JsValue>
         _ => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_reference),
     };
 
-    /// <summary>Mints a value the engine owns. Providers only â€” see <see cref="Providers.JsProviderValue"/>.</summary>
+    /// <summary>Mints a value the engine owns. Providers only — see <see cref="Providers.JsProviderValue"/>.</summary>
     internal static JsValue FromReference(JsValueKind kind, object reference) => new(kind, 0d, reference);
 }
 
@@ -280,7 +280,7 @@ public readonly struct JsValue : IEquatable<JsValue>
 /// </summary>
 /// <remarks>
 /// Not a conformant implementation of the specification's algorithm and not used for anything a page
-/// can observe â€” a value that reaches script goes through the engine's own conversion. It exists so
+/// can observe — a value that reaches script goes through the engine's own conversion. It exists so
 /// that a log line reads <c>1</c> rather than <c>1.0</c>, which the CLR's default would give and which
 /// made bridge diagnostics disagree with the page they described.
 /// </remarks>

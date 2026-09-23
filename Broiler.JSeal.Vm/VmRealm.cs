@@ -25,7 +25,7 @@ namespace Broiler.JSeal.Vm;
 /// property read and listener dispatch afterwards happens inside a step already.
 /// </para>
 /// </remarks>
-internal sealed partial class VmRealm : IJsRealm
+internal partial class VmRealm : IJsRealm
 {
     private readonly VmRuntime _runtime;
     private readonly VmVerifiedArtifact _artifact;
@@ -88,9 +88,10 @@ internal sealed partial class VmRealm : IJsRealm
     /// Capturing it on the way out keeps a guest throw a guest throw.
     /// </para>
     /// </remarks>
-    private T InStep<T>(Func<JsHostRealm, T> body)
+    internal T InStep<T>(Func<JsHostRealm, T> body)
     {
         ThrowIfDisposed();
+        ThrowIfInModuleHost();
 
         var host = Host;
 
@@ -128,7 +129,7 @@ internal sealed partial class VmRealm : IJsRealm
         return result!;
     }
 
-    private void InStep(Action<JsHostRealm> body) =>
+    internal void InStep(Action<JsHostRealm> body) =>
         InStep<object?>(realm =>
         {
             body(realm);
@@ -184,6 +185,10 @@ internal sealed partial class VmRealm : IJsRealm
             return;
 
         _disposed = true;
+
+        // The module map first: its loads are cancelled and its waiters released while the
+        // instance still exists, and nothing it does afterwards reaches the realm.
+        _moduleMap?.Dispose();
 
         _instance.Dispose();
         _artifact.Dispose();

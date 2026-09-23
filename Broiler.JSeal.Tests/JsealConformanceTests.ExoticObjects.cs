@@ -10,7 +10,7 @@ namespace Broiler.JSeal.Tests;
 /// </summary>
 public partial class JsealConformanceTests
 {
-    // â”€â”€ exotic objects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── exotic objects ─────────────────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource)]
@@ -26,7 +26,7 @@ public partial class JsealConformanceTests
 
         // The case IJsExotic.cs describes in as many words: a collection containing an element
         // NAMED "item" must not shadow its own item() method. Ordinary properties are consulted
-        // first and the handler answers only what they did not â€” getting this backwards is silently
+        // first and the handler answers only what they did not — getting this backwards is silently
         // wrong, and the failure is a page whose search box stops working, months later.
         realm.DefineValue(collection, "item", realm.NewMethod("item", static (in JsCall _) => JsValue.String("the method")));
         realm.DefineValue(realm.Global, "collection", collection);
@@ -35,7 +35,7 @@ public partial class JsealConformanceTests
         Assert.Equal("the method", Eval(realm, "collection.item()", "test:exotic-item"));
         Assert.DoesNotContain("item", handler.AskedNames);
 
-        // â€¦and a name the ordinary properties do NOT have reaches the handler, from the host and
+        // …and a name the ordinary properties do NOT have reaches the handler, from the host and
         // from script alike.
         Assert.True(realm.GetProperty(collection, "named") == JsValue.String("named:named"));
         Assert.Equal("named:named", Eval(realm, "collection.named", "test:exotic-named"));
@@ -83,7 +83,7 @@ public partial class JsealConformanceTests
         realm.DefineValue(collection, "item", JsValue.String("the method"));
         realm.DefineValue(realm.Global, "enumerable", collection);
 
-        // Indices, then ordinary properties, then the handler's supported names â€” the order the
+        // Indices, then ordinary properties, then the handler's supported names — the order the
         // provider's enumerator produces, pinned so that a second provider has a shape to match
         // rather than a blank to fill in. The indices are in the list at all because presence,
         // enumeration and retrieval are separate entry points with no single hook between them, so
@@ -107,14 +107,14 @@ public partial class JsealConformanceTests
     /// An exotic object's supported names in <c>Object.keys</c> and in a spread.
     /// </summary>
     /// <remarks>
-    /// <b>This test found a defect in the Broiler.JS provider, and the defect is fixed â€” the
+    /// <b>This test found a defect in the Broiler.JS provider, and the defect is fixed — the
     /// remark below is kept because it is the only record of what was wrong.</b>
     /// <see cref="IJsExotic.SupportedNames"/> says in as many words that the names are "for
-    /// <c>Object.keys</c>, <c>forâ€¦in</c> and spread", and the provider supplied them by appending to
-    /// <c>GetAllKeys</c> alone â€” which is enough for <c>forâ€¦in</c> and
+    /// <c>Object.keys</c>, <c>for…in</c> and spread", and the provider supplied them by appending to
+    /// <c>GetAllKeys</c> alone — which is enough for <c>for…in</c> and
     /// <c>Object.getOwnPropertyNames</c> (both pass, above) and not enough for the other two.
     /// <c>Object.keys</c> implements EnumerableOwnProperties: it snapshots the own keys and then asks
-    /// <c>[[GetOwnProperty]]</c> for each one, keeping only the enumerable ones â€” and a supported
+    /// <c>[[GetOwnProperty]]</c> for each one, keeping only the enumerable ones — and a supported
     /// name had no own descriptor, so it was dropped. <c>Object.assign</c>, and therefore an object
     /// spread, filtered the same way, so a page enumerating a form's controls with
     /// <c>Object.keys(form.elements)</c> or <c>{...form.elements}</c> got the indices and the

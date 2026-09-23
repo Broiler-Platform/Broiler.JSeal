@@ -31,18 +31,11 @@ public partial class JsealConformanceTests
         new Dictionary<(string, string), string>
         {
             [("broiler-js", nameof(AConflictingScriptIsRefusedBeforeItCreatesAnything))] =
-                "the pinned Broiler.JavaScript 0.1.0-preview.1 JSContext.Eval runs no GlobalDeclarationInstantiation " +
+                "the pinned Broiler.JavaScript 0.1.0-preview.3 JSContext.Eval runs no GlobalDeclarationInstantiation " +
                 "checks, so a script redeclaring an earlier script's let, or a let over a var, is evaluated",
             [("broiler-js", nameof(DynamicSourceIsEvalCodeAndItsLexicalDeclarationsDoNotPersist))] =
                 "the Broiler.JS provider evaluates dynamic source through the same JSContext.Eval as a script, so " +
                 "its let persists and its var is non-configurable; a PerformEval route is a provider follow-up",
-            [("broiler-vm", nameof(AConflictingScriptIsRefusedBeforeItCreatesAnything))] =
-                "the pinned Broiler.VM 0.1.0-preview.3 has no script-goal host route, so host and classic scripts run through " +
-                "the realm's eval, which runs no GlobalDeclarationInstantiation checks; JsHostRealm.EvaluateScript (VM JSD-0024 " +
-                "section 16) is adopted with the next VM pin",
-            [("broiler-vm", nameof(DynamicSourceIsEvalCodeAndItsLexicalDeclarationsDoNotPersist))] =
-                "the pinned Broiler.VM 0.1.0-preview.3 evaluates global eval code with script semantics (its let persists and its " +
-                "var is non-configurable); VM V15 corrects eval, and the provider adopts it with the next VM pin",
         };
 
     /// <summary>Runs a case, or, for a recorded gap, requires the case's own assertions to fail.</summary>

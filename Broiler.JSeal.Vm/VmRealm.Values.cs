@@ -10,7 +10,7 @@ namespace Broiler.JSeal.Vm;
 /// <see cref="IJsValues"/>: minting values, the two coercions that can run guest code, and a truthiness
 /// test that on this profile needs no crossing at all.
 /// </summary>
-internal sealed partial class VmRealm
+internal partial class VmRealm
 {
     /// <inheritdoc />
     public JsValue NewObject() => InStep(realm => VmMarshal.Wrap(realm.NewObject()));
@@ -399,43 +399,43 @@ internal sealed partial class VmRealm
     /// <inheritdoc />
     /// <remarks>
     /// <para>
-    /// <b>No crossing, because the one kind the contract member exists for is one this profile does not
-    /// have.</b> Its host surface has no BigInt value kind, its <c>BigInt</c> global is unbound, and its
-    /// front end refuses a BigInt literal by name, so every value of this realm is of a kind
-    /// <see cref="JsValue.AsBoolean"/> already decides correctly. Crossing to ask would spend a host-call
-    /// charge to be told what the handle knew. There is nothing to delegate to either: the host realm
-    /// publishes no truthiness coercion, and the host value's own <c>AsBoolean()</c> reads a boolean's
-    /// payload and answers <see langword="false"/> for every other kind, a non-empty string included.
+    /// <b>No crossing: the handle decides every kind but a BigInt, and the box decides a BigInt.</b>
+    /// The host realm publishes no truthiness coercion, and the host value's own <c>AsBoolean()</c>
+    /// reads a boolean's payload and answers <see langword="false"/> for every other kind, so there is
+    /// nothing to delegate to - and a BigInt handle from this provider carries its exact integer,
+    /// which is <c>0n</c> or it is not.
     /// </para>
     /// <para>
-    /// <b>The unwrap is a refusal, not a conversion.</b> A BigInt handle cannot have come from this
-    /// realm, and <see cref="VmMarshal.Unwrap"/> is the one place that says so, for the same reason it
-    /// refuses a handle another engine minted. Answering from the handle there would answer
+    /// <b>The unwrap is also the foreign-engine check.</b> Answering from the handle alone would answer
     /// <see langword="true"/> for another engine's <c>0n</c>, which is the defect this member was added
-    /// to remove.
+    /// to remove; <see cref="VmMarshal.Unwrap"/> refuses such a handle instead.
     /// </para>
     /// </remarks>
     public bool ToBoolean(JsValue value)
     {
         ThrowIfDisposed();
-        _ = VmMarshal.Unwrap(value);
+        var converted = VmMarshal.Unwrap(value);
 
-        return value.AsBoolean;
+        return converted.Kind is JsHostValueKind.BigInt
+            ? !converted.AsBigInt().GetValueOrDefault().IsZero
+            : value.AsBoolean;
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// The handle's operator, after both handles pass the foreign-engine check: this profile has no
-    /// BigInt, the one kind the operator cannot decide, and <see cref="VmMarshal.Unwrap"/> refuses a
-    /// BigInt handle, which cannot have come from one of its realms, as it does for
-    /// <see cref="ToBoolean"/>. <see cref="JsValue.Missing"/> is taken as <c>undefined</c>, as the
-    /// contract says.
+    /// The handle's operator, after both handles pass the foreign-engine check, except for two
+    /// BigInts: the operator compares their boxes by reference, and the language compares their
+    /// values, which the boxes carry exactly. <see cref="JsValue.Missing"/> is taken as
+    /// <c>undefined</c>, as the contract says.
     /// </remarks>
     public bool IsStrictlyEqual(JsValue left, JsValue right)
     {
         ThrowIfDisposed();
-        _ = VmMarshal.Unwrap(left);
-        _ = VmMarshal.Unwrap(right);
+        var leftValue = VmMarshal.Unwrap(left);
+        var rightValue = VmMarshal.Unwrap(right);
+
+        if (leftValue.Kind is JsHostValueKind.BigInt || rightValue.Kind is JsHostValueKind.BigInt)
+            return leftValue.Kind == rightValue.Kind && leftValue.AsBigInt() == rightValue.AsBigInt();
 
         return (left.IsMissing ? JsValue.Undefined : left) == (right.IsMissing ? JsValue.Undefined : right);
     }

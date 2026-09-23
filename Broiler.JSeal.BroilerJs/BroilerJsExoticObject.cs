@@ -6,7 +6,7 @@ using Broiler.JavaScript.Storage;
 namespace Broiler.JSeal.BroilerJs;
 
 /// <summary>
-/// A <c>JSObject</c> whose property lookup an <see cref="IJsExotic"/> completes â€” the one object in
+/// A <c>JSObject</c> whose property lookup an <see cref="IJsExotic"/> completes — the one object in
 /// this provider that has to know the engine's lookup <em>protocol</em> rather than only its types.
 /// </summary>
 /// <remarks>
@@ -16,14 +16,14 @@ namespace Broiler.JSeal.BroilerJs;
 /// two declarations and <c>WebStorageBinding</c>'s storage area each subclassed <c>JSObject</c> and
 /// overrode the same members, which made them the deepest engine coupling in the binding layer. The
 /// members overridden here are exactly the ones they overrode, because those are the ones the engine
-/// dispatches lookup through: <c>GetValue(KeyString, â€¦)</c> for a named read,
-/// <c>GetValue(uint, â€¦)</c> for an indexed one, <c>SetValue(KeyString, â€¦)</c> for a named write,
+/// dispatches lookup through: <c>GetValue(KeyString, …)</c> for a named read,
+/// <c>GetValue(uint, …)</c> for an indexed one, <c>SetValue(KeyString, …)</c> for a named write,
 /// <c>HasProperty</c> for <c>in</c>, and <c>GetAllKeys</c> for enumeration.
 /// </para>
 /// <para>
 /// <b>ORDERING IS LOAD-BEARING: the base lookup runs FIRST, and the handler answers only what it did
-/// not.</b> Every one of the six classes did this â€” the class remarks of <c>DomCollectionBinding</c> and
-/// <c>StyleDeclarationBinding</c> state it for their replacement handlers â€” and it is what
+/// not.</b> Every one of the six classes did this — the class remarks of <c>DomCollectionBinding</c> and
+/// <c>StyleDeclarationBinding</c> state it for their replacement handlers — and it is what
 /// WebIDL's named-property semantics require. Getting it backwards is silently wrong rather than
 /// loudly wrong: a collection that happens to contain an element named <c>item</c> would start
 /// shadowing its own <c>item()</c> method, and every ordinary member of a style declaration would
@@ -32,8 +32,8 @@ namespace Broiler.JSeal.BroilerJs;
 /// </para>
 /// <para>
 /// <b>A write is the exception, and deliberately so.</b> <see cref="IJsExotic.TrySetNamed"/> is
-/// consulted before the ordinary assignment because a legacy platform object with a named setter â€”
-/// <c>Storage</c>, <c>CSSStyleDeclaration</c> â€” has to see the value before it becomes an ordinary
+/// consulted before the ordinary assignment because a legacy platform object with a named setter —
+/// <c>Storage</c>, <c>CSSStyleDeclaration</c> — has to see the value before it becomes an ordinary
 /// property, or the property it did not intercept shadows the item it was supposed to store. The
 /// handler declines by answering <see langword="false"/>, and the ordinary assignment then happens.
 /// </para>
@@ -68,7 +68,7 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// </summary>
     /// <remarks>
     /// Carried so that a value crossing this object's boundary can be attributed to a realm without a
-    /// thread-static being consulted â€” the same reason <c>JsCall</c> carries one, and the reason the
+    /// thread-static being consulted — the same reason <c>JsCall</c> carries one, and the reason the
     /// engine's lookup overrides below never need to ask which realm they are in.
     /// </remarks>
     internal BroilerJsRealm Realm { get; }
@@ -236,14 +236,14 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// <b>The supported names are appended to the enumeration rather than installed as properties.</b>
     /// Installing them would be the shorter code and would break the lookup order this class exists to
     /// preserve: an installed name is an ordinary property, so the next read would find the stale
-    /// value in property storage and never reach the handler â€” a live object that stopped being live
+    /// value in property storage and never reach the handler — a live object that stopped being live
     /// the first time anything enumerated it. Indices are materialised because the engine's presence
     /// and enumeration hooks give no alternative (see <see cref="Sync"/>); names have an alternative,
     /// so they take it.
     /// </para>
     /// <para>
     /// The handler is asked not to repeat ordinary properties, which
-    /// <see cref="IJsExotic.SupportedNames"/> states, so no de-duplication happens here â€” doing it
+    /// <see cref="IJsExotic.SupportedNames"/> states, so no de-duplication happens here — doing it
     /// would hide a handler that violated the contract instead of letting the duplicate be seen.
     /// </para>
     /// </remarks>
@@ -259,13 +259,13 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// <remarks>
     /// <para>
     /// <b>Appending to <see cref="GetAllKeys"/> is necessary and is not sufficient, which the JSEAL
-    /// conformance suite caught.</b> <c>forâ€¦in</c> and <c>Object.getOwnPropertyNames</c> read the
+    /// conformance suite caught.</b> <c>for…in</c> and <c>Object.getOwnPropertyNames</c> read the
     /// enumeration and were already right. <c>Object.keys</c> does not: it implements
     /// EnumerableOwnProperties, which snapshots the own keys and then asks <c>[[GetOwnProperty]]</c>
     /// for each one, keeping only the enumerable ones
     /// (<c>JSObjectStatic.Introspection.cs:219-232</c>). A supported name had no own descriptor, so it
     /// was snapshotted and then dropped. <c>Object.assign</c> filters the same way, so an object
-    /// spread lost them too â€” meaning <c>Object.keys(form.elements)</c> and
+    /// spread lost them too — meaning <c>Object.keys(form.elements)</c> and
     /// <c>{...form.elements}</c> saw the indices and the interface's own members but none of the
     /// named controls.
     /// </para>
@@ -273,7 +273,7 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// The descriptor is synthesised on each ask rather than installed, for the same reason the names
     /// are not installed: an installed property is a stale answer the next read would find before it
     /// reached the handler. Enumerable and configurable, and writable exactly when the handler accepts
-    /// a write to that name â€” which is what WebIDL says a named property is.
+    /// a write to that name — which is what WebIDL says a named property is.
     /// </para>
     /// </remarks>
     public override JSValue GetOwnPropertyDescriptor(JSValue name)

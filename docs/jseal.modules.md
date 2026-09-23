@@ -17,6 +17,9 @@ The observations below were checked on 2026-09-21. JSeal was at `37d9825`. Broil
 from its pinned package `0.1.0-preview.1`. The VM results come from its **current source** at
 `484f389`, run through the JavaScript CLI, not from the pinned `0.1.0-preview.3` packages; they
 show what the engine can do, not what JSeal can reach today. Node v24.17 gave the reference answers.
+This section is a record of that date: Broiler.JS `0.1.0-preview.3`, pinned since 2026-09-23,
+implements the module semantics the table below found missing; see
+[I10 implementation status](#i10-implementation-status).
 
 ### JSeal
 
@@ -499,122 +502,105 @@ no references. The design left three details open:
   already knows its own `Resolve` and `LoadAsync` answers.
 
 **Gating.** [Gating until I13](#capability-promises-and-witnesses) proposed that a gated realm report
-Modules. It does not. The Broiler.JS adapter cannot keep the whole Modules promise on the pinned
-engine, so a realm from `new BroilerJsEngineProvider { EnableModuleContract = true }` implements
-`IJsModules` and reports the same flags as any other realm from the provider. The rule "a realm
+Modules. It does not. The Broiler.JS adapter does not route `import()` through the map, so it cannot
+keep the whole Modules and DynamicImport promise, and a realm from
+`new BroilerJsEngineProvider { EnableModuleContract = true }` implements `IJsModules` and reports the
+same flags as any other realm from the provider. The rule "a realm
 without Modules must not implement `IJsModules`" therefore holds only outside that internal gate.
 I13 decides the flags. Registered and adopted realms never implement `IJsModules`.
+
+**Pins.** I10 was built on 2026-09-21 against Broiler.JS `0.1.0-preview.1`, which had no live
+bindings, no module scope, no cross-module TDZ and a misordered top-level await, so the adapter
+refused at link time every graph it could see that engine would run wrongly. On 2026-09-23 the pin
+moved to `0.1.0-preview.3` (the first release on nuget.org), whose `JSModuleContext` loads, links and
+evaluates a module graph as ECMAScript specifies. The adapter was reduced to what the engine does
+not do for it; this section describes it as it is now.
 
 **How the Broiler.JS adapter works.** [BroilerJsModuleContext](../Broiler.JSeal.BroilerJs/BroilerJsRealm.Modules.cs)
 subclasses `JSModuleContext`:
 
-- It is built with the realm's job pump and `enableClrIntegration: false`. The adapter removes
+- It is built with the realm's job pump, `enableClrIntegration: false` and
+  `registerBuiltInModules: false`, so no built-in `module` or `clr` module exists. The adapter removes
   `assert` and `global`, so a module realm has the same global names as a classic realm.
-- Its `LoadModuleAsync` override answers each request with the module the map already loaded for
-  it. No specifier, including `module`, `clr` or text spelled like a key, reaches the engine's cache.
+- The engine resolves every request through `Resolve`: a root, and each static request of each
+  module in the graph it links. The override answers a root with its internal name, and a module's
+  request with the internal name of the module the host resolved it to when the map loaded the graph
+  (`BroilerJsModuleMap.ResolveForEngine`). Nothing else resolves.
+- `ReadModuleSourceAsync` hands the engine the text the host loaded, unchanged.
 
 [The map](../Broiler.JSeal.BroilerJs/BroilerJsModuleMap.cs) handles loading:
 
 - It resolves every specifier through the host and applies every load in a `QueueRealmTask` task.
-- It compiles each text with the engine's own compiler before anything runs. A parse error is a
-  `Parse`-phase `JsModuleException` whose inner exception comes from the shared `JsEngineException`
+- It compiles each text with the engine's own module compiler before anything runs. A parse error is
+  a `Parse`-phase `JsModuleException` whose inner exception comes from the shared `JsEngineException`
   boundary, with the module's label.
 - It parses each text again with the engine's parser to read the module's static requests. This is
-  not linking: the engine binds imported names itself, when evaluation reaches each declaration.
+  not linking; the engine links.
 - It enforces `MaxModules` when a new module would be added, before the host is asked to load it, so
   a graph that keeps requesting new modules fails the `Load` phase instead of loading without end.
 
-**Module code is strict.** The pinned engine compiles module text as the sloppy body of a function
-and has no strictness option. The map therefore prepends `"use strict";` to the text it hands the
-engine, on the first line or on the line after a hashbang, which is how this provider already forces
-strictness on host source. An assignment to an undeclared name throws `ReferenceError`, `this` in a
-plain function call is `undefined`, and `with` or a legacy octal literal fails the `Parse` phase. Line
-numbers are unchanged. Engine-reported columns on the directive's line, in parse messages and in
-guest stack traces, are 13 characters too high.
+**Linking and evaluation are the engine's.** `IJsModule.Evaluate` asks the engine for the module,
+which then loads the graph from the map's records, links it (a missing or ambiguous export is its
+`SyntaxError`), binds imports as live immutable bindings, gives each module its own strict module
+scope (no CommonJS bindings, top-level `this` is `undefined`, `arguments` is unbound, top-level
+`var` and function declarations are not global properties), handles cycles with a temporal dead zone,
+runs the asynchronous-module algorithm for top-level await, and caches each evaluation error. The
+engine evaluates a whole graph from the root it was asked for, so the adapter reads a dependency's
+status from the engine's own module record and, once the engine has evaluated it, joins its cached
+outcome so the dependency's `IJsModule` settles too (`JoinEngineOutcomes`). Evaluation settles only
+through `DrainJobs`: a module realm runs its jobs as tasks on a realm scheduler, because the engine's
+module loading is asynchronous .NET code whose continuations run on `TaskScheduler.Current`, which
+outside such a task is the thread pool.
 
-Evaluation is the engine's. The adapter shares each module's evaluation task, so a module body runs
-once, a later importer receives the same cached error, and an importer waits for an asynchronous
-dependency. Evaluation settles only through `DrainJobs`. A module realm runs its jobs as tasks on a
-realm scheduler, because the engine's `new JSPromise(Task)` settles through `ContinueWith` on
-`TaskScheduler.Current`. Outside such a task, that continuation would run on the thread pool.
-
-The module parse goal is internal in the pinned package (`CoreScript.AllowTopLevelAwaitScope` and
+The module parse goal is not public in the pinned package (`CoreScript.AllowTopLevelAwaitScope` and
 `ModuleGoalScope`), so the adapter reaches it by reflection. If either member is missing,
 `OpenModuleMap` throws `NotSupportedException` instead of parsing with the script goal.
 
-**Refusals.** The adapter refuses a graph at link time when it can see from the text alone that the
-pinned engine would run it wrongly. The graph fails with a `Link`-phase `JsModuleException` that
-names the reason and is never evaluated. With the refusals disabled, the shared cases gave the wrong
-answers shown here:
-
-| Refused | Why | Wrong answer without the refusal |
-|---|---|---|
-| An exported `let`, `var`, function or class binding the module ever reassigns, or that a direct `eval` could reassign | Imports are copies, not live bindings | `1:1` instead of `1:2` |
-| A cyclic static graph | No cross-module TDZ or live bindings | `no TDZ` instead of `ReferenceError` |
-| An asynchronous dependency (top-level await anywhere below it) that is not the module's last static request | The engine waits for it before starting the next import | `slow:start,slow:end,quick,main` instead of `slow:start,quick,slow:end,main` |
-| A static `import` or `export ... from` after any other statement | The engine evaluates a dependency where its declaration appears | Not probed; follows from the compiler |
-| An `export { name }` list before the declaration of `name` (a function declaration excepted) | The list copies the binding when it runs | Not probed; follows from the compiler |
-| Any `import()` | I12 routes it through the map | Not applicable |
-| An `export { name }` list whose `name` is no module-level declaration the analysis can see | Neither check above could run on it | Not observed; the engine rejects an undeclared name |
-| A reference to `module`, `exports`, `require`, `__dirname` or `__fileame`, anywhere, including a same-named parameter | The engine passes module code these CommonJS parameters | `typeof module` is `object`; `module.exports = {...}` replaces the namespace, and `exports.name = ...` extends it |
-| Any direct `eval` | It could reach those parameters | As above |
-| `this` or `arguments` outside a non-arrow function or class body | Module code runs as a function whose `this` is the engine's module object | `typeof this` and `typeof arguments` are `object` instead of `undefined` |
-| A top-level `var` (at any block depth) or function declaration whose name another module in the map also declares that way, or reads without declaring it, or that the global object already has | The engine binds these declarations on the realm's global object | `99:dep,dep` instead of `1:dep,main` for two modules that each declare `count` and `helper` |
-
-The checks are syntactic and conservative. They walk every field of every syntax node by
-reflection, because the engine's `AstReduce` skips variable initializers, object literal members,
-parameter defaults and switch cases. A `var` nested in a block, loop, `switch` or `try` counts as a
-module-level declaration; before the adversarial review it did not, and
-`if (true) { var x = 1; } export { x }` with a later `x = 2` gave `1:1` unrefused. Only a
-non-computed member property, a non-computed property key that is not shorthand, a label and
-`import.meta` or `new.target` are skipped as names that are never references.
-
-The cross-module check compares a module's top-level `var` and function names with the other
-modules' and with the names they read without declaring anywhere. A module that declares a name in a
-nested scope and also reads the same name free elsewhere is not caught. A later classic script, or a
-host write, that creates a global property of the same name is not checked either.
-
-The probe table under [Broiler.JS](#broilerjs-broilerjavascriptmodules-010-preview1) recorded
-`before` for an importer after top-level await. Through the adapter, which shares each module's
-evaluation task, the importer sees `after`, and the shared case passes. Only a later sibling import
-is misordered, and that is refused.
+**The one refusal.** A module that calls `import()`, anywhere, fails a `Link`-phase
+`JsModuleException` and is never evaluated. The engine resolves an `import()` specifier through the
+same synchronous `Resolve` at run time, and the adapter can answer `Resolve` only from resolutions the
+host made when the graph loaded; routing `import()` through the map (I12) is not done for this
+provider. The check walks every field of every syntax node by reflection, because the engine's
+`AstReduce` skips variable initializers, object literal members, parameter defaults and switch cases.
 
 The adapter also fails explicitly in these cases:
 
-- `GetNamespace` before evaluation starts throws `InvalidOperationException`, because the engine
-  creates the exports object when evaluation starts.
-- `require()` is refused at link time with the other CommonJS names. The engine's own request for
-  it rejects with `TypeError`, which the refusal leaves unreachable.
+- `GetNamespace` before any evaluation of the module's graph has started throws
+  `InvalidOperationException`: the engine links a graph only when an evaluation of it starts, and
+  exposes no link-only entry point.
 - An import attribute fails the `Resolve` phase as `UnsupportedAttributes`.
-- A request that is not one of the module's static requests rejects with `TypeError`.
+- `require()` is not defined in module code, so a call of it is a guest `ReferenceError`.
 
-**Gaps that are reported, not refused.** The shared tests list these as expected failures for
-Broiler.JS:
+**Recorded gaps for Broiler.JS.** The shared tests list these as expected failures, each with its
+reason:
 
-- The namespace is the engine's ordinary exports object. It has no `@@toStringTag`, its keys are in
-  source order, and it is extensible and writable: `ns.x = 99` and `ns.extra = 1` succeed in strict
-  code, where ECMAScript throws `TypeError`, and later reads of the namespace see the written values.
-- A missing or ambiguous export reads `undefined` instead of failing to link.
-- The engine's parser rejects `import 'specifier';`, so such a module fails the `Parse` phase.
-- A module's top-level `var` and function declarations are properties of the realm's global object,
-  visible as `globalThis.name` and to classic scripts. The refusal above covers only the name
-  collisions it can see.
+- `TheNamespaceIsAvailableAsSoonAsTheModuleIsLinked`: as above, `GetNamespace` refuses before
+  `Evaluate`.
+- `AMissingExportIsALinkError`: the engine links when an evaluation starts, so a missing export is
+  that evaluation's `SyntaxError` (no module body runs) rather than a `Link`-phase `LoadAsync`
+  failure. The adapter does not resolve exports itself.
+- `AnImporterRunsAfterItsDependencysTopLevelAwait`: the engine starts a host-requested evaluation one
+  job after the request (its `ImportAsync` waits a job before linking), so a dependency is still
+  `Linked` when `Evaluate` returns. Its public entry points (`RunAsync`, `RunScriptAsync`,
+  `JSModule.ImportAsync`) all take that route; none links and evaluates synchronously. The order of
+  evaluation itself is right: the importer sees the dependency's value after its top-level await.
+- The I12 dynamic-import cases in
+  [JsealConformanceTests.DynamicImport.cs](../Broiler.JSeal.Tests/JsealConformanceTests.DynamicImport.cs)
+  (the same namespace as a static import, shared concurrent loads, every failure kind, a graph
+  whose earlier sibling throws, nested imports, `import()` in eval and `Function` code, a
+  restricted-eval realm, and disposal of the map and of the realm) fail by the refusal above.
+  `DynamicImportFollowsTheMapsOptions` fails because a host script's `import()` meets the engine's
+  own global loader, which resolves through the adapter's `Resolve` and finds nothing.
 
-These are recorded as refused gaps in the shared cases, so they fail rather than pass:
-`ModulesDoNotShareTopLevelVarBindings`, `ModuleCodeHasNoCommonJsBindings` and
-`TopLevelThisIsUndefinedAndArgumentsIsUnbound`. `ModuleCodeIsStrict` passes.
+Deviations recorded on `0.1.0-preview.1` and not re-probed on `0.1.0-preview.3`, and not yet covered
+by a shared case:
 
-Other deviations, not yet covered by a shared case:
+- `export function f() {}` followed by `export { f as g }` failed to compile.
+- `export default function f() {}` followed by another `export` failed to parse.
+- An anonymous default export was not named `default`.
+- An HTML-like comment (`<!--`) was accepted in module text instead of being a `SyntaxError`.
 
-- `export function f() {}` followed by `export { f as g }` fails to compile.
-- `export default function f() {}` followed by another `export` fails to parse
-  (`Unexpected token Identifier: export`).
-- An anonymous default export is not named `default`. For `export default function () {}`,
-  `export default class {}` and `export default (function () {})`, the function's `name` is the
-  importer's local name, such as `g` for `import g from`, instead of `default`.
-- An HTML-like comment (`<!--`) is accepted in module text instead of being a `SyntaxError`.
-  A text-level refusal would also refuse strings that contain them, so this is reported, not refused.
-- `import.meta` has no `url`; populating it is deferred, as designed.
+`import.meta` has no `url`: `GetModuleUrl` returns null, and populating it is deferred, as designed.
 
 **Tests.** [JsealConformanceTests.Modules.cs](../Broiler.JSeal.Tests/JsealConformanceTests.Modules.cs)
 holds the provider-neutral cases for I11 to reuse unchanged:
@@ -622,33 +608,74 @@ holds the provider-neutral cases for I11 to reuse unchanged:
 - Every (engine, case) pair runs either as a passing case or as a recorded gap.
 - A gap row requires the case to fail, either by the adapter's refusal or by the contract assertion
   that catches the wrong answer. A gap that starts passing fails the suite.
-- Broiler.VM has an engine-level gap until I11.
-- The I12 dynamic-import cases in
-  [JsealConformanceTests.DynamicImport.cs](../Broiler.JSeal.Tests/JsealConformanceTests.DynamicImport.cs)
-  (the same namespace as a static import, shared concurrent loads, every failure kind, a graph
-  whose earlier sibling throws, nested imports, `import()` in eval and `Function` code, a
-  restricted-eval realm, the map's options with the script's label as referrer, and disposal of the
-  map and of the realm) are recorded gaps for Broiler.JS: the adapter refuses a module containing
-  `import()`, and a script's `import()` meets the engine's own loader.
-- `AnEvaluationErrorStopsTheWalkBeforeALaterSibling` passes on Broiler.JS: a sibling after a
-  thrower does not run and stays `Linked`. `AThrowInACycleLeavesAnUnreachedDependencyLinked` is a
-  refused gap there, with the other cyclic graphs.
+- Broiler.VM runs the same cases through its own adapter since I11 (below), with no gap row.
+- On Broiler.JS every case passes except the gaps listed above, the cyclic, live-binding,
+  top-level-await, namespace-object, module-scope and CommonJS-binding cases included.
 
 [BroilerJsModuleAdapterTests.cs](../Broiler.JSeal.Tests/BroilerJsModuleAdapterTests.cs) holds the
-adapter's own refusal and near-miss cases.
+adapter's own refusal, its near misses, and the graphs `0.1.0-preview.1` made it refuse, each asserted
+to run with ECMAScript's answer.
 
-**Upstream Broiler.JS additions from I10.** These join the upstream slice above:
+**Upstream Broiler.JS additions from I10.** Landed in `0.1.0-preview.3`: the side-effect import
+grammar, module code compiled strict without CommonJS parameters or a module object as `this`, a
+module environment for top-level declarations, live bindings, and the namespace exotic object.
+Still open:
 
-- A public module-goal parse entry point.
-- The side-effect import grammar.
-- The export-list lookup of an exported function declaration.
-- Not exposing the CommonJS parameters, or a module object as `this`, to ES module code.
-- Compiling module code strict, so the adapter's `"use strict";` prefix and its column shift can go.
-- A module environment for top-level `var` and function declarations instead of the global object.
-- `export default function f() {}` followed by further exports, and `default` as the name of an
-  anonymous default export.
-- A non-writable namespace, which the namespace exotic object item already covers.
-- HTML-like comments as a `SyntaxError` in module code.
+- A public module-goal parse entry point, so the adapter needs no reflection.
+- A public way to load and link a graph without evaluating it, which would close the namespace,
+  missing-export and top-level-await-status gaps.
+- The unverified deviations listed above, if they persist.
+
+## I11 and I12 implementation status (Broiler.VM)
+
+Adopted 2026-09-23 against the released Broiler.VM `0.1.0-preview.4`, which carries
+`JsHostRealm.LoadModule`, `EvaluateModule`, `TryGetModuleState`, `IJsHostModuleLoader`,
+`CompleteModuleRequest` and `FailModuleRequest` (VM JSD-0024 sections 15 and 20). The adapter was
+prepared earlier against unpublished local candidates and re-created here against the package. **All
+47 provider-neutral module cases pass on broiler-vm with no gap row**, the eleven dynamic-import
+cases included. No provider advertises Modules or DynamicImport; that is I13's.
+
+**The VM adapter (I11)** is reached through the internal `VmEngineProvider.EnableModuleContract`
+gate, like the Broiler.JS one. A gated realm registers the profile's `ResolveCapability` and a bridge
+that implements `IJsHostModuleLoader`; a realm from the registered provider has neither, so a guest
+`import()` there is still rejected with a `TypeError` (`VmModuleAdapterTests`).
+
+- **Loading is JSeal's, linking is the VM's.** [The map](../Broiler.JSeal.Vm/VmModuleMap.cs)
+  resolves every specifier through the host, loads each key once, and checks each text under the
+  module goal as it arrives, so a parse error fails the load before any dependency is resolved.
+  When a graph's sources are present it compiles them into one artifact rooted at the requested
+  module and calls `LoadModule` under a one-shot permit: the source provider answers exactly that
+  module request with exactly that artifact, and the profile's resolver question is answered from
+  the resolutions the host gave. Identity is the realm's module registry, so every route to a key
+  reaches one instance and one namespace, available as soon as `LoadAsync` completes.
+- **A handle per module costs a compilation per module.** The profile answers a handle only for an
+  artifact's root, so every other module of a new graph is linked again, rooted at itself; the realm
+  adopts the instance it already holds. Compilation is host work, outside the realm's fuel;
+  `MaxModules` and what the host agrees to load bound it.
+- **Status is read from the realm.** `TryGetModuleState` answers `[[Status]]`, `[[EvaluationError]]`
+  and `[[CycleRoot]]` by key, and the map maps them. Two rules are JSeal's own: a cycle member takes
+  its answer from its cycle root, which owns the evaluation promise of every member; and a module
+  the language has finished reports `EvaluatingAsync` until the evaluation that finished it has
+  delivered its settlement, observed through one reaction attached with `Promise.prototype.then`
+  captured at realm creation. A realm with no intrinsic `then` refuses to evaluate rather than leave
+  a graph `EvaluatingAsync` for good.
+- **An import attribute** is a `Resolve`-phase `UnsupportedAttributes` failure naming the specifier.
+
+**Dynamic import (I12).** The profile offers every `import()` it cannot answer from the calling
+module's static requests to the map, with the referrer the calling code was compiled with: a
+module's key, or, for a host or classic script, its label behind a `U+0001` tag so that it is never
+read as a module key. The map resolves it (`JsModuleRequestKind.Dynamic`), loads the graph, and from
+a realm task completes it (`CompleteModuleRequest`; the profile links, evaluates and settles the
+import through the job queue) or fails it (`FailModuleRequest`: `TypeError` for resolution and load
+failures, `SyntaxError` for a parse failure). `AllowDynamicImport = false`, or a script caller with
+`AllowImportFromScripts = false`, leaves the import to the profile, which rejects it without asking
+the host. Module loading does not consult AllowGuestEval. Disposing the map cancels its loads and
+rejects a deferred import with a `TypeError`; disposing the realm settles nothing.
+
+**Not done.** The Modules and DynamicImport witnesses (I13). The referrer of code a promise job runs
+(`p.then(eval)`) is deliberately not pinned by any case: HostEnqueuePromiseJob asks an
+implementation to make the enqueuing script or module active again, which Broiler.VM does and
+Node does not; whether the contract should require it of every provider is an I09/I13 decision.
 
 ## Owner decisions pending
 
@@ -666,7 +693,6 @@ adapter's own refusal and near-miss cases.
        period on `ModuleSupport` first, during which the callback keeps applying to adopted realms
        only, documented as "host-asserted, not witnessed by JSEAL";
     3. whether the bridge migration slice above is scheduled before that release or after it.
-- **Resolved on 2026-09-22: both VM host additions were implemented upstream** (JSD-0024 sections
-  15, 16 and 20, in the Broiler.VM working tree, unreleased), so I11 and I12 are no longer blocked
-  for want of a VM operation. What they wait for now is a Broiler.VM release and a pin update: the
-  adoption is prepared against a local candidate and is not part of this repository's merged state.
+- **Resolved: both VM host additions were implemented upstream** (JSD-0024 sections 15, 16 and 20)
+  and released in Broiler.VM `0.1.0-preview.4`; the VM adapter adopts them since 2026-09-23 (see
+  [I11 and I12 implementation status](#i11-and-i12-implementation-status-broilervm)).

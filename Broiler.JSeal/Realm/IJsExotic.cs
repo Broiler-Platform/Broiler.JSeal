@@ -8,17 +8,17 @@ namespace Broiler.JSeal;
 /// <remarks>
 /// <para>
 /// These are the objects the bridge used to express by subclassing <c>JSObject</c> and overriding
-/// its property-lookup members â€” the deepest engine coupling in the whole binding layer, because it
+/// its property-lookup members — the deepest engine coupling in the whole binding layer, because it
 /// depended not only on the engine's types but on its lookup <em>protocol</em>. Six classes did it;
 /// handler classes in the bridge implement this instead, and the one subclass left is the provider's.
 /// Declaring the hook rather than inheriting it is what lets an engine that dispatches lookups
-/// differently â€” through a Proxy, through a C callback table â€” serve the same DOM object.
+/// differently — through a Proxy, through a C callback table — serve the same DOM object.
 /// </para>
 /// <para>
 /// <b>Ordinary properties win, and the order is not negotiable.</b> The engine consults its own
 /// property storage first and only asks a handler when it finds nothing. This is what WebIDL's
-/// named-property semantics require and what <c>BroilerJsExoticObject</c> does â€” it asks the base
-/// lookup first â€” and getting it backwards is silently wrong rather than loudly wrong: a collection
+/// named-property semantics require and what <c>BroilerJsExoticObject</c> does — it asks the base
+/// lookup first — and getting it backwards is silently wrong rather than loudly wrong: a collection
 /// that happens to contain an element named <c>item</c> would start shadowing its own
 /// <c>item()</c> method, and every ordinary member of a style declaration would be interceptable by a
 /// CSS property of the same name.
@@ -63,7 +63,7 @@ public interface IJsExotic
 
     /// <summary>
     /// The names this object supplies beyond its ordinary properties, for <c>Object.keys</c>,
-    /// <c>forâ€¦in</c> and spread. Ordinary properties are added by the engine and must not be repeated
+    /// <c>for…in</c> and spread. Ordinary properties are added by the engine and must not be repeated
     /// here.
     /// </summary>
     IReadOnlyList<string> SupportedNames { get; }

@@ -10,7 +10,7 @@ public enum JsErrorKind
     /// <summary>A plain <c>Error</c>.</summary>
     Error,
 
-    /// <summary>A <c>TypeError</c> â€” by far the most common, and what WebIDL raises for a wrong argument type or an illegal invocation.</summary>
+    /// <summary>A <c>TypeError</c> — by far the most common, and what WebIDL raises for a wrong argument type or an illegal invocation.</summary>
     TypeError,
 
     /// <summary>A <c>RangeError</c>.</summary>
@@ -29,8 +29,8 @@ public enum JsErrorKind
 /// <remarks>
 /// <para>
 /// A provider wraps whatever its engine throws in this, so a host <c>catch</c> can be written once
-/// instead of once per engine. The bridge catches broadly today â€” every script and module evaluation
-/// sits in <c>catch (Exception)</c> and is logged and skipped â€” which works but cannot tell a page's
+/// instead of once per engine. The bridge catches broadly today — every script and module evaluation
+/// sits in <c>catch (Exception)</c> and is logged and skipped — which works but cannot tell a page's
 /// <c>throw</c> apart from a bug in the bridge. Catching this can.
 /// </para>
 /// <para>
@@ -109,7 +109,7 @@ public sealed class JsEngineException : Exception
 /// <remarks>
 /// Distinct from <see cref="JsEngineException"/> on purpose: that one means the page's code went
 /// wrong, this one means the host's did. A host that branches on
-/// <see cref="IJsRealm.Capabilities"/> never sees it, which is the point â€” it is the backstop for a
+/// <see cref="IJsRealm.Capabilities"/> never sees it, which is the point — it is the backstop for a
 /// call site that forgot to.
 /// </remarks>
 public sealed class JsCapabilityUnavailableException : Exception

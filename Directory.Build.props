@@ -12,6 +12,15 @@
     <PackageTags>broiler;jseal;javascript;engine;abstraction;interop;realm</PackageTags>
   </PropertyGroup>
 
+  <!-- The vendored props pack the repository README, which is written for this repository:
+       its links are relative, so they break on nuget.org. Packages carry their own README,
+       still packed as README.md so PackageReadmeFile needs no override. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Remove="$(MSBuildThisFileDirectory)README.md" />
+    <None Include="$(MSBuildThisFileDirectory)eng\nuget\README.md"
+          Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
   <!--
     ════════════════════════════════════════════════════════════════════
     THE TWO DIAGNOSTICS THIS COMPONENT PROMOTES TO ERRORS.

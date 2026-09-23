@@ -14,6 +14,19 @@ candidate but waits for a VM release. Remaining: I13, I18's WorkerRealms, and me
 adoption (including B06's VM-dependent half) once a VM release exists. Nothing here has been
 published; the existing package baseline is `0.1.0-preview.1`.
 
+**Update 2026-09-23: pins moved to the nuget.org releases.** Broiler.VM `0.1.0-preview.4` and
+Broiler.JavaScript `0.1.0-preview.3` are on nuget.org and pinned; the earlier pins were never
+published there. Adopted with the pin: the VM provider runs host and classic source through
+`JsHostRealm.EvaluateScript` (script goal, with its conflict checks), dynamic source as eval code,
+direct eval against the caller's scope (V14), and BigInt across the boundary (B06's VM half). The
+Broiler.JS module adapter now answers the engine's own resolution of every static request and reads
+dependency status and namespaces from the engine's module records. Later the same day: the
+Broiler.JS adapter's preview.1 refusals were retired except the one for `import()` (thirteen more
+module gaps closed); the VM provider declares StructuredClone over `DetachClone`/`AdoptClone` (I18,
+WorkerRealms still undeclared); and the VM module adapter (I11) with `import()` routing (I12's VM
+half) was re-created against the release, all 47 module cases passing on broiler-vm. Still open:
+`import()` through the Broiler.JS adapter, WorkerRealms, and I13.
+
 **Where the prepared adoption is.** Several statuses below name a patch file, such as
 `jseal-vm-next3-over-normal.patch`. Those are not in this repository and are not meant to be: they
 hold the code that only compiles against Broiler.VM host APIs no package carries yet, kept outside
@@ -50,8 +63,9 @@ After restoring for `Release-VM`, all 143 JSeal tests passed. Additional tempora
 defects not covered by that suite. Both local CLI hosts were also rebuilt and given identical
 JavaScript probes. This was targeted verification, not a complete Test262 run.
 
-JSeal currently consumes Broiler.JavaScript packages at `0.1.0-preview.1` and VM packages at
-`0.1.0-preview.3`. A current source checkout and a pinned package are different test targets.
+JSeal currently consumes Broiler.JavaScript packages at `0.1.0-preview.3` and VM packages at
+`0.1.0-preview.4`, all from nuget.org, the only feed the Broiler packages are published to. A current
+source checkout and a pinned package are different test targets.
 For example, current Broiler.JS has `Array.fromAsync` and grouping APIs that were absent from the
 packaged provider exercised during the review. Never silently substitute one target for the other.
 

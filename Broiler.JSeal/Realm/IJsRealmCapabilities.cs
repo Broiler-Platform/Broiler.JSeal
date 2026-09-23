@@ -19,25 +19,25 @@ public interface IJsValues
     JsValue NewArray(ReadOnlySpan<JsValue> elements = default);
 
     /// <summary>
-    /// A new non-constructable host function â€” a WebIDL operation or attribute accessor.
+    /// A new non-constructable host function — a WebIDL operation or attribute accessor.
     /// </summary>
     /// <remarks>
     /// <b>Non-constructable is the default because WebIDL says so, and because it is what makes a
     /// wrapper affordable.</b> Only interface objects are constructors; <c>el.setAttribute.prototype</c>
     /// is <c>undefined</c> and <c>new el.setAttribute()</c> throws. Under Broiler.JS this maps to
     /// <c>createPrototype: false</c>, which the bridge adopted as a memory fix as much as a
-    /// correctness one â€” an element wrapper's members were each allocating an unreachable prototype
+    /// correctness one — an element wrapper's members were each allocating an unreachable prototype
     /// object plus its <c>constructor</c> back-reference. Anything a page may legitimately
     /// <c>new</c> asks for <see cref="NewConstructor"/> instead, and there are sixteen of those.
     /// </remarks>
     /// <param name="name">The function's <c>name</c>.</param>
     /// <param name="body">The host code to run.</param>
-    /// <param name="length">The function's declared <c>length</c> â€” its count of required arguments.</param>
+    /// <param name="length">The function's declared <c>length</c> — its count of required arguments.</param>
     JsValue NewMethod(string name, JsNativeFunction body, int length = 0);
 
     /// <summary>
-    /// A new constructable host function â€” an interface object a page may <c>new</c>
-    /// (<c>Headers</c>, <c>Request</c>, <c>Response</c>, <c>FormData</c>, <c>Worker</c>, â€¦).
+    /// A new constructable host function — an interface object a page may <c>new</c>
+    /// (<c>Headers</c>, <c>Request</c>, <c>Response</c>, <c>FormData</c>, <c>Worker</c>, …).
     /// </summary>
     /// <remarks>
     /// The returned function carries a <c>prototype</c> object, reachable with
@@ -46,7 +46,7 @@ public interface IJsValues
     JsValue NewConstructor(string name, JsNativeFunction body, int length = 0);
 
     /// <summary>
-    /// A new object whose property lookup the host completes â€” a live collection, a style
+    /// A new object whose property lookup the host completes — a live collection, a style
     /// declaration, a storage area. Requires <see cref="JsCapabilities.ExoticObjects"/>.
     /// </summary>
     /// <remarks>
@@ -127,7 +127,7 @@ public interface IJsValues
     /// <see cref="JsValueKind.BigInt"/>: <c>ToBoolean(0n)</c> is <see langword="false"/>, the handle's
     /// switch sends every kind above <see cref="JsValueKind.String"/> to <see langword="true"/>, and the
     /// handle carries a BigInt as a reference it cannot look inside. A site reading a value the page
-    /// supplied â€” an argument, a member of a dictionary the page wrote â€” can be handed one.
+    /// supplied — an argument, a member of a dictionary the page wrote — can be handed one.
     /// </para>
     /// <para>
     /// <b>A provider decides that kind however its engine lets it, and may answer every other kind
@@ -227,7 +227,7 @@ public interface IJsMembers
     IReadOnlyList<string> OwnPropertyNames(JsValue target);
 
     /// <summary>
-    /// Points <paramref name="target"/>'s prototype chain at <paramref name="prototype"/> â€” how a DOM
+    /// Points <paramref name="target"/>'s prototype chain at <paramref name="prototype"/> — how a DOM
     /// wrapper is linked to its interface so that <c>Object.getPrototypeOf(el) === Element.prototype</c>
     /// and <c>el.constructor.name</c> answer the interface rather than <c>Object</c>.
     /// </summary>
@@ -266,15 +266,15 @@ public interface IJsCalls
     /// <paramref name="kind"/> with <paramref name="message"/>.
     /// </summary>
     /// <remarks>
-    /// It returns rather than throws so that a callback body reads <c>throw realm.Error(â€¦)</c>, which
-    /// tells the compiler the path ends and the reader that the throw is deliberate â€” a helper that
+    /// It returns rather than throws so that a callback body reads <c>throw realm.Error(…)</c>, which
+    /// tells the compiler the path ends and the reader that the throw is deliberate — a helper that
     /// threw would leave the compiler thinking control continued.
     /// </remarks>
     Exception Error(JsErrorKind kind, string message);
 
     /// <summary>
     /// The DOM exception to <see langword="throw"/> so that JavaScript sees a <c>DOMException</c> with
-    /// the given <c>name</c> â€” <c>NotFoundError</c>, <c>HierarchyRequestError</c>, and the rest.
+    /// the given <c>name</c> — <c>NotFoundError</c>, <c>HierarchyRequestError</c>, and the rest.
     /// </summary>
     Exception DomError(string name, string message);
 }
@@ -284,7 +284,7 @@ public interface IJsCalls
 /// one piece of script and the next.
 /// </summary>
 /// <remarks>
-/// <b>Pull, not push.</b> The host drives this â€” it decides when a microtask checkpoint happens,
+/// <b>Pull, not push.</b> The host drives this — it decides when a microtask checkpoint happens,
 /// because in a browser that decision belongs to the event loop and not to the engine. Broiler.JS
 /// pushes instead, through a <c>SynchronizationContext</c> captured when the realm is built, and the
 /// provider is what turns that into the pull shape here. An engine with an explicit
@@ -352,12 +352,12 @@ public interface IJsSource
     JsValue EvaluateClassicScript(string source, string label);
 
     /// <summary>
-    /// Runs JavaScript the page asked to evaluate AT RUN TIME, on the page's behalf â€” what
+    /// Runs JavaScript the page asked to evaluate AT RUN TIME, on the page's behalf — what
     /// <c>eval</c> and <c>new Function</c> ask for.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Throws when the realm was not built with <see cref="JsCapabilities.GuestEval"/> â€” which is what
+    /// Throws when the realm was not built with <see cref="JsCapabilities.GuestEval"/> — which is what
     /// a page whose policy forbids evaluation gets, and is a contract outcome the page may catch
     /// rather than a check the engine performs.
     /// </para>
@@ -365,7 +365,7 @@ public interface IJsSource
     /// <b>It is narrower than its name once suggested.</b> A page's script ELEMENT is not this: it is
     /// <see cref="EvaluateClassicScript"/>, governed by a different directive, and routing one here
     /// would refuse a page that every browser runs. The provider also enforces this permission where
-    /// a browser does â€” inside the realm, on the page's own <c>eval</c> and <c>Function</c> â€” so a
+    /// a browser does — inside the realm, on the page's own <c>eval</c> and <c>Function</c> — so a
     /// host that never calls this member still gets the policy it asked for.
     /// </para>
     /// </remarks>

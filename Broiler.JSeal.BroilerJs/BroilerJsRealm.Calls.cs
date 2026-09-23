@@ -45,9 +45,9 @@ internal partial class BroilerJsRealm
     /// Calls a constructor with <c>new</c>.
     /// </summary>
     /// <remarks>
-    /// The receiver of a construct call is the constructor itself under this engine â€” that is what
+    /// The receiver of a construct call is the constructor itself under this engine — that is what
     /// <c>CreateInstance</c> reads to derive <c>new.target</c>, and what the bridge already passes at
-    /// its own construct sites (<c>domExCtor.CreateInstance(new Arguments(domExCtor, â€¦))</c>).
+    /// its own construct sites (<c>domExCtor.CreateInstance(new Arguments(domExCtor, …))</c>).
     /// </remarks>
     public JsValue Construct(JsValue constructor, ReadOnlySpan<JsValue> arguments = default)
     {
@@ -105,7 +105,7 @@ internal partial class BroilerJsRealm
     /// carries the <c>name</c>, <c>code</c> and <c>message</c> it branches on and is
     /// <c>instanceof DOMException</c>. That constructor is installed by the bridge's registration
     /// pass, not by the engine, so this is one of the few places a provider depends on the host having
-    /// built its globals â€” and the fallback is what happens before it has, or in a realm that never
+    /// built its globals — and the fallback is what happens before it has, or in a realm that never
     /// will.
     /// </para>
     /// <para>
@@ -136,7 +136,7 @@ internal partial class BroilerJsRealm
     /// <remarks>
     /// This one does allocate, and unlike the trampoline it has to: <c>Arguments</c> is a struct with
     /// four inline slots and no constructor that takes a span, so anything wider than four is going to
-    /// become an array inside it anyway. Renting would not help â€” the array is handed to the engine
+    /// become an array inside it anyway. Renting would not help — the array is handed to the engine
     /// and may outlive the call through a captured <c>arguments</c> object.
     /// </remarks>
     private static JSValue[] UnwrapAll(ReadOnlySpan<JsValue> arguments)

@@ -10,7 +10,7 @@ namespace Broiler.JSeal.Tests;
 /// </summary>
 public partial class JsealConformanceTests
 {
-    // â”€â”€ members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── members ────────────────────────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(Engines))]
@@ -108,7 +108,7 @@ public partial class JsealConformanceTests
         realm.DefineValue(target, "alpha", JsValue.Number(1d));
         realm.DefineAccessor(target, "beta", static (in JsCall _) => JsValue.Number(2d), setter: null);
 
-        // Creation order, not sorted order â€” the bridge's nested-browsing-context sweep diffs this
+        // Creation order, not sorted order — the bridge's nested-browsing-context sweep diffs this
         // list across an evaluation and a reordering would make the diff report members that never
         // moved.
         Assert.Equal(new[] { "gamma", "alpha", "beta" }, realm.OwnPropertyNames(target));
@@ -154,7 +154,7 @@ public partial class JsealConformanceTests
         Assert.True(realm.GetIndex(target, 1) == JsValue.String("one"));
 
         // An array generic asks whether index i is PRESENT before reading it, which an index
-        // installed under the string key "0" would answer no to â€” the defect that made a live
+        // installed under the string key "0" would answer no to — the defect that made a live
         // collection produce a hole per element under Array.prototype.map.call.
         Assert.Equal("zero|one", Eval(realm, "Array.prototype.join.call(indexProbe, '|')", "test:generic"));
     }
@@ -175,14 +175,14 @@ public partial class JsealConformanceTests
         Assert.True(realm.GetProperty(instance, "inherited") == JsValue.String("from-prototype"));
         Assert.True(realm.GetPrototype(instance) == prototype);
 
-        // â€¦and the chain is not the object's own names.
+        // …and the chain is not the object's own names.
         Assert.DoesNotContain("inherited", realm.OwnPropertyNames(instance));
 
         realm.DefineValue(realm.Global, "protoProbe", instance);
         Assert.Equal("true", Eval(realm, "String(Object.getPrototypeOf(protoProbe) === Object.getPrototypeOf(protoProbe))", "test:proto"));
     }
 
-    // â”€â”€ calls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── calls ──────────────────────────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(Engines))]
@@ -299,7 +299,7 @@ public partial class JsealConformanceTests
     {
         using var realm = NewRealm(engine);
 
-        // A bare realm has no DOM globals â€” building them is the bridge's job, not the provider's â€”
+        // A bare realm has no DOM globals — building them is the bridge's job, not the provider's —
         // so the constructor the contract names is installed here first. That is also the assertion:
         // DomError must go through the realm's own DOMException rather than mint an error of its
         // own, because a page branches on `name` and on `instanceof DOMException`.
@@ -325,7 +325,7 @@ public partial class JsealConformanceTests
                 "test:domerror"));
     }
 
-    // â”€â”€ method versus constructor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── method versus constructor ──────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(Engines))]
@@ -336,7 +336,7 @@ public partial class JsealConformanceTests
         realm.DefineValue(realm.Global, "operation", realm.NewMethod("operation", static (in JsCall _) => JsValue.String("called")));
 
         // WebIDL: only an interface object is a constructor. `el.setAttribute.prototype` is
-        // undefined in a browser and `new el.setAttribute()` is a TypeError â€” and under this engine
+        // undefined in a browser and `new el.setAttribute()` is a TypeError — and under this engine
         // the two are the same fact, because IsConstructor tests for the prototype object. It is
         // also the allocation DomFunction was introduced to stop: a prototype object plus its
         // constructor back-reference per member, on wrappers with ~149 members each.
@@ -397,10 +397,10 @@ public partial class JsealConformanceTests
     /// <c>new.target</c> inside a host constructor's own body.
     /// </summary>
     /// <remarks>
-    /// <b>This test found a defect in the Broiler.JS provider, and the defect is fixed â€” the
+    /// <b>This test found a defect in the Broiler.JS provider, and the defect is fixed — the
     /// remark below is kept because it is the only record of what was wrong.</b>
     /// <c>JsCall.NewTarget</c> promises the construct target for a construct call, and
-    /// <c>BroilerJsRealm.Dispatch</c> read it from <c>JSEngine.NewTarget</c> alone â€” which resolves
+    /// <c>BroilerJsRealm.Dispatch</c> read it from <c>JSEngine.NewTarget</c> alone — which resolves
     /// <c>Frames.CurrentNewTarget</c>, the interpreter's frame stack. A native function's body is
     /// invoked as a delegate and pushes no such frame, so the read was null and every host
     /// constructor saw <see cref="JsValue.Missing"/>. The value was there to be had: the engine's
@@ -433,7 +433,7 @@ public partial class JsealConformanceTests
         Assert.Equal("Probe", target);
     }
 
-    // â”€â”€ jobs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── jobs ───────────────────────────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(Engines))]
@@ -474,7 +474,7 @@ public partial class JsealConformanceTests
         Assert.Equal(2, realm.DrainJobs());
         Assert.Equal(new[] { "outer", "inner" }, order);
 
-        // â€¦and the limit is what keeps a chain that re-queues itself from holding the checkpoint
+        // …and the limit is what keeps a chain that re-queues itself from holding the checkpoint
         // forever. It is a bound on jobs run, not a bound on depth.
         var ran = 0;
         void Requeue()
@@ -539,7 +539,7 @@ public partial class JsealConformanceTests
     /// choice.</b> So <c>globalThis.Promise = MyThing</c> is a thing a page may legally do, and a
     /// provider that read the global at the moment the bridge asked for a promise would hand that
     /// page every <c>fetch</c> result, every <c>whenDefined</c> and every stream the bridge is
-    /// about to resolve â€” with the page's own code deciding what happens to each.
+    /// about to resolve — with the page's own code deciding what happens to each.
     /// </para>
     /// <para>
     /// The fix is to capture the intrinsic before any page script runs, and this is the assertion
@@ -581,7 +581,7 @@ public partial class JsealConformanceTests
     /// <b>This is the case that decides whether a provider's promise is real or is a snippet.</b>
     /// A page whose policy forbids evaluation is the page most likely to reach for <c>fetch</c>,
     /// and a provider that built its promises by evaluating source would hand that page a promise
-    /// assembled out of the one thing it had just refused â€” or refuse the <c>fetch</c>, which is
+    /// assembled out of the one thing it had just refused — or refuse the <c>fetch</c>, which is
     /// worse, because the policy said nothing about network access.
     /// </para>
     /// <para>

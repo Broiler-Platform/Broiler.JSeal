@@ -33,16 +33,14 @@ public partial class JsealConformanceTests
         new Dictionary<string, Func<IJsEngineProvider>>
         {
             ["broiler-js"] = static () => new BroilerJsEngineProvider { EnableModuleContract = true },
+#if BROILER_VM_JS
+            ["broiler-vm"] = static () => new Broiler.JSeal.Vm.VmEngineProvider { EnableModuleContract = true },
+#endif
         };
 
     /// <summary>Registered engines without a module adapter, and why. A recorded gap, not an exemption.</summary>
     private static readonly IReadOnlyDictionary<string, string> ModuleContractEngineGaps =
-        new Dictionary<string, string>
-        {
-            ["broiler-vm"] =
-                "I11: the VM adapter needs a public JsHostRealm operation that runs an in-memory module graph " +
-                "inside an existing realm (VM ledger JSW-8/JSP-10); the pinned 0.1.0-preview.3 packages have none",
-        };
+        new Dictionary<string, string>();
 
     /// <summary>
     /// A case an engine's adapter cannot meet, why, and what the failure looks like: the exception an
@@ -50,87 +48,44 @@ public partial class JsealConformanceTests
     /// </summary>
     /// <remarks>
     /// A <see cref="JsModuleException"/> refusal is expected in <see cref="Phase"/>: the adapter's own
-    /// refusals are link-time, and a text the pinned engine cannot parse fails at parse time.
+    /// refusal (a module that calls <c>import()</c>) is link-time.
     /// </remarks>
     private sealed record ModuleCaseGap(string Reason, Type? RefusedWith, JsModulePhase Phase = JsModulePhase.Link);
 
     private const string ImportCallRefused =
-        "I12 routes import() through the map only where the engine's loader can be given the map's answer, and the pinned " +
-        "Broiler.JS loader answers only a module's static requests; the adapter refuses a module containing import() at link time";
-
-    private const string AsyncBeforeAnotherRequest =
-        "an import waits for an asynchronous dependency before the next import starts; the adapter refuses an asynchronous dependency that is not a module's last request";
-
-    private const string UpstreamBroilerJs =
-        "Upstream Broiler.JS module-semantics slice (docs/jseal.modules.md), taken through a J19 pin update: ";
+        "Broiler.JS 0.1.0-preview.3 resolves an import() specifier through JSModuleContext.Resolve at run time, synchronously, " +
+        "and the adapter answers Resolve only from the host resolutions it made when the graph loaded; routing import() " +
+        "through the map (I12) is not done for this provider, so the adapter refuses a module containing import() at link time";
 
     private static readonly IReadOnlyDictionary<(string Engine, string Case), ModuleCaseGap> ModuleCaseGaps =
         new Dictionary<(string, string), ModuleCaseGap>
         {
-            [("broiler-js", nameof(LiveBindingsReachImporters))] = new(
-                UpstreamBroilerJs + "Broiler.JS 0.1.0-preview.1 imports copies; the adapter refuses a reassigned export at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(ACycleSeesATemporalDeadZoneThenTheLiveValue))] = new(
-                UpstreamBroilerJs + "no cross-module TDZ or live bindings; the adapter refuses cyclic graphs at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(AnAsyncDependencyDoesNotDelayItsLaterSiblings))] = new(
-                UpstreamBroilerJs + "an import waits for an asynchronous dependency before the next import starts; the adapter refuses an asynchronous dependency that is not a module's last request",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(AnAsyncRejectionLeavesTheSiblingsThatRanEvaluated))] = new(
-                UpstreamBroilerJs + "an import waits for an asynchronous dependency before the next import starts; the adapter refuses an asynchronous dependency that is not a module's last request",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(AnEarlierAsyncRejectionDoesNotHideTheModuleThatThrew))] = new(
-                UpstreamBroilerJs + "an import waits for an asynchronous dependency before the next import starts; the adapter refuses an asynchronous dependency that is not a module's last request",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(AModuleWaitingOnTwoRejectionsTakesTheFirstInTime))] = new(
-                UpstreamBroilerJs + "an import waits for an asynchronous dependency before the next import starts; the adapter refuses an asynchronous dependency that is not a module's last request",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(AnEqualPrimitiveFromAnAwaitingModuleDoesNotHideTheThrower))] = new(
-                UpstreamBroilerJs + AsyncBeforeAnotherRequest, typeof(JsModuleException)),
-            [("broiler-js", nameof(AnAsyncRejectionInAHostCallbackLeavesTheSiblingsThatRanEvaluated))] = new(
-                UpstreamBroilerJs + AsyncBeforeAnotherRequest, typeof(JsModuleException)),
             [("broiler-js", nameof(TheNamespaceIsAvailableAsSoonAsTheModuleIsLinked))] = new(
-                UpstreamBroilerJs + "the engine creates a module's exports object when evaluation starts; GetNamespace refuses before Evaluate",
+                "Broiler.JS 0.1.0-preview.3 loads and links a graph only when an evaluation of it starts, and exposes no " +
+                "public link-only entry point; GetNamespace refuses before Evaluate",
                 typeof(InvalidOperationException)),
-            [("broiler-js", nameof(TheNamespaceIsAModuleNamespaceExoticObject))] = new(
-                UpstreamBroilerJs + "the namespace is the engine's ordinary exports object (no @@toStringTag, unsorted keys, extensible, writable); reported, not refusable",
-                null),
-            [("broiler-js", nameof(TopLevelDeclarationsAreNotGlobalProperties))] = new(
-                UpstreamBroilerJs + "a module's top-level var and function declarations become properties of the realm's global object; " +
-                "the adapter refuses a graph in which another module or the global object shares such a name, and reports the rest",
-                null),
-            [("broiler-js", nameof(ModulesDoNotShareTopLevelVarBindings))] = new(
-                UpstreamBroilerJs + "top-level var and function declarations of different modules would be one global binding; the adapter refuses the graph at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(ModuleCodeHasNoCommonJsBindings))] = new(
-                UpstreamBroilerJs + "the engine passes module, exports, require, __dirname and __fileame to module code; the adapter refuses a module that names them at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(TopLevelThisIsUndefinedAndArgumentsIsUnbound))] = new(
-                UpstreamBroilerJs + "module code runs as a function body whose this is the engine's module object; the adapter refuses a module that reads this or arguments outside a function at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(ASideEffectOnlyImportLoadsItsDependency))] = new(
-                UpstreamBroilerJs + "the 0.1.0-preview.1 parser rejects `import 'specifier';`, so the module fails to load with its SyntaxError",
-                typeof(JsModuleException), JsModulePhase.Parse),
             [("broiler-js", nameof(AMissingExportIsALinkError))] = new(
-                UpstreamBroilerJs + "the engine does not link, so an import of a name the dependency does not export reads undefined; reported, not refusable",
+                "Broiler.JS 0.1.0-preview.3 links when an evaluation starts, so a missing export is that evaluation's " +
+                "SyntaxError rather than a Link-phase LoadAsync failure; the adapter does not resolve exports itself; " +
+                "reported, not refusable",
                 null),
-            [("broiler-js", nameof(DynamicImportReachesTheNamespaceAStaticImportDoes))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(ConcurrentDynamicImportsShareOneLoadAndOneEvaluation))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(EveryDynamicImportFailureRejectsTheImport))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(NestedDynamicImportsCarryTheCallingModulesKey))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(ADynamicImportStopsAtItsGraphsFirstEvaluationError))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(ImportInEvalAndFunctionCodeCarriesTheCallingModulesKey))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(AThrowInACycleLeavesAnUnreachedDependencyLinked))] = new(
-                UpstreamBroilerJs + "no cross-module TDZ or live bindings; the adapter refuses cyclic graphs at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(ACycleMemberTakesTheErrorItsCycleRootRejectsWith))] = new(
-                UpstreamBroilerJs + "no cross-module TDZ or live bindings; the adapter refuses cyclic graphs at link time",
-                typeof(JsModuleException)),
-            [("broiler-js", nameof(DynamicImportIsNotGuestEvaluation))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(DisposingTheRealmAbandonsADeferredImport))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
-            [("broiler-js", nameof(DisposingTheMapRejectsADeferredImport))] = new(UpstreamBroilerJs + ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(DynamicImportReachesTheNamespaceAStaticImportDoes))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(ConcurrentDynamicImportsShareOneLoadAndOneEvaluation))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(EveryDynamicImportFailureRejectsTheImport))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(NestedDynamicImportsCarryTheCallingModulesKey))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(ADynamicImportStopsAtItsGraphsFirstEvaluationError))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(ImportInEvalAndFunctionCodeCarriesTheCallingModulesKey))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(DynamicImportIsNotGuestEvaluation))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(DisposingTheRealmAbandonsADeferredImport))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(DisposingTheMapRejectsADeferredImport))] = new(ImportCallRefused, typeof(JsModuleException)),
+            [("broiler-js", nameof(AnImporterRunsAfterItsDependencysTopLevelAwait))] = new(
+                "Broiler.JS 0.1.0-preview.3 starts a host-requested evaluation one job after the request (its ImportAsync " +
+                "awaits a job before it links), so a dependency is still Linked when Evaluate returns; the engine exposes no " +
+                "synchronous link-and-evaluate entry point; reported, not refusable",
+                null),
             [("broiler-js", nameof(DynamicImportFollowsTheMapsOptions))] = new(
-                UpstreamBroilerJs + "import() in a host script meets the engine's own loader, which answers no specifier the map resolved, so the import rejects; reported, not refusable",
+                "import() in a host script meets the engine's own global import loader, which resolves through the adapter's " +
+                "Resolve and so finds no specifier the map did not resolve for a module; the import rejects; reported, not refusable",
                 null),
         };
 
@@ -249,7 +204,7 @@ public partial class JsealConformanceTests
             {
                 Assert.Equal(gap.Phase, moduleRefusal.Phase);
                 if (gap.Phase == JsModulePhase.Link)
-                    Assert.Contains("Refused until the upstream Broiler.JS", moduleRefusal.Message);
+                    Assert.Contains("is refused: ", moduleRefusal.Message);
             }
         }
         else

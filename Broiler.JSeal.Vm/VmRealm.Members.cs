@@ -12,7 +12,7 @@ namespace Broiler.JSeal.Vm;
 /// member is stays out of the flags on both sides, because it is decided by which method installs
 /// it.
 /// </remarks>
-internal sealed partial class VmRealm
+internal partial class VmRealm
 {
     /// <inheritdoc />
     public void DefineValue(

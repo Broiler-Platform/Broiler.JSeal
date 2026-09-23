@@ -5,8 +5,8 @@ using Broiler.JSeal.BroilerJs;
 namespace Broiler.JSeal.Tests;
 
 /// <summary>
-/// The Broiler.JS module adapter's own refusals: the graphs Broiler.JS 0.1.0-preview.1 would run
-/// wrongly, refused at link time with the reason, and the near misses it must still run.
+/// The Broiler.JS module adapter's own refusal - a module that calls <c>import()</c> - and the graphs
+/// Broiler.JS 0.1.0-preview.1 made it refuse, which 0.1.0-preview.3 runs as ECMAScript says.
 /// </summary>
 /// <remarks>
 /// Engine-specific, so these live beside the other Broiler.JS-only tests rather than in the shared
@@ -15,38 +15,12 @@ namespace Broiler.JSeal.Tests;
 public class BroilerJsModuleAdapterTests
 {
     [Theory]
-    [InlineData("export let x = 1; x = 2;", "'x' is reassigned")]
-    [InlineData("export var x = 1; function set() { [x] = [2]; }", "'x' is reassigned")]
-    [InlineData("export function f() {} f = null;", "'f' is reassigned")]
-    [InlineData("let y = 1; export { y as z }; for (y of [2]);", "'y' is reassigned")]
-    [InlineData("export let x = 1; eval('');", "a direct eval could reassign")]
-    [InlineData("export { x }; let x = 1;", "precedes the declaration of 'x'")]
-    [InlineData("globalThis.first = 1; import * as other from './other';", "follows other statements")]
-    [InlineData("export const load = () => import('./other');", "import() is not routed")]
+    [InlineData("export const load = () => import('./other');")]
     // Nodes the engine's own AstReduce walker skips: object literal members, switch cases, parameter defaults.
-    [InlineData("const o = { m() { return import('./other'); } };", "import() is not routed")]
-    [InlineData("switch (1) { case 1: import('./other'); }", "import() is not routed")]
-    [InlineData("function f(p = import('./other')) {}", "import() is not routed")]
-    [InlineData("export let x = 1; const o = { m() { x = 2; } };", "'x' is reassigned")]
-    // A var hoisted out of a block, loop or try is still a module-level binding.
-    [InlineData("if (true) { var x = 1; } export { x }; export function bump() { x = 2; }", "'x' is reassigned")]
-    [InlineData("try { var x = 1; } finally {} export { x }; export function bump() { x = 5; }", "'x' is reassigned")]
-    [InlineData("export { x }; if (true) { var x = 1; }", "precedes the declaration of 'x'")]
-    [InlineData("export { i }; for (var i = 0; i < 3; i++);", "precedes the declaration of 'i'")]
-    // The CommonJS parameters the engine passes to module code, which ECMAScript module code does not have.
-    [InlineData("export const k = typeof module;", "'module'")]
-    [InlineData("export const x = 1; exports.injected = 2;", "'exports'")]
-    [InlineData("export const x = 1; const o = { module };", "'module'")]
-    [InlineData("export const k = typeof require;", "'require'")]
-    [InlineData("let caught; try { require('./other'); } catch (e) { caught = e; } export const seen = caught;", "'require'")]
-    [InlineData("export const k = typeof __dirname;", "'__dirname'")]
-    [InlineData("export const k = typeof __fileame;", "'__fileame'")]
-    [InlineData("export const f = () => module;", "'module'")]
-    [InlineData("export const k = typeof arguments;", "'arguments'")]
-    [InlineData("export const k = typeof this;", "'this'")]
-    [InlineData("export const f = () => this;", "'this'")]
-    [InlineData("export const k = 1; eval('module.exports = {}');", "direct eval")]
-    public async Task AGraphTheEngineWouldRunWronglyIsRefusedAtLinkWithTheReason(string source, string reason)
+    [InlineData("const o = { m() { return import('./other'); } };")]
+    [InlineData("switch (1) { case 1: import('./other'); }")]
+    [InlineData("function f(p = import('./other')) {}")]
+    public async Task AModuleThatCallsImportIsRefusedAtLinkWithTheReason(string source)
     {
         var host = new Host { ["mem:/main"] = source, ["mem:/other"] = "export const o = 1;" };
         using var realm = ModuleRealm(out var map, host);
@@ -54,8 +28,43 @@ public class BroilerJsModuleAdapterTests
         var failure = await Assert.ThrowsAsync<JsModuleException>(() => host.Load(realm, map, "./main"));
         Assert.Equal(JsModulePhase.Link, failure.Phase);
         Assert.Equal("mem:/main", failure.Key?.Value);
-        Assert.Contains(reason, failure.Message);
+        Assert.Contains("import() is not routed", failure.Message);
         Assert.False(map.TryGetModule(new JsModuleKey("mem:/main"), out _));
+    }
+
+    /// <summary>
+    /// Each graph here was refused at link time on Broiler.JS 0.1.0-preview.1, which imported copies,
+    /// ran a dependency where its declaration stood, and compiled module code as a CommonJS function
+    /// body. It now links and evaluates, and <c>seen</c> is ECMAScript's answer.
+    /// </summary>
+    [Theory]
+    // Exports are live bindings, whoever assigns them and however.
+    [InlineData("export let x = 1; x = 2; export const seen = String(x);", "2")]
+    [InlineData("export var x = 1; function set() { [x] = [2]; } set(); export const seen = String(x);", "2")]
+    [InlineData("export function f() {} f = null; export const seen = String(f);", "null")]
+    [InlineData("let y = 1; export { y as z }; for (y of [2]); export const seen = String(y);", "2")]
+    [InlineData("export let x = 1; eval('x = 2'); export const seen = String(x);", "2")]
+    [InlineData("export { x }; let x = 1; export const seen = String(x);", "1")]
+    [InlineData("export { i }; for (var i = 0; i < 3; i++); export const seen = String(i);", "3")]
+    // A static import is evaluated before the module body, wherever it stands.
+    [InlineData("globalThis.first = 1; import * as other from './other'; export const seen = other.o + ':' + globalThis.first;", "1:1")]
+    // Module code has no CommonJS bindings, and its top-level this and arguments are ECMAScript's.
+    [InlineData("export const seen = [typeof module, typeof exports, typeof require, typeof __dirname, typeof __fileame].join();", "undefined,undefined,undefined,undefined,undefined")]
+    [InlineData("let seen; try { require('./other'); } catch (e) { seen = e.name; } export { seen };", "ReferenceError")]
+    [InlineData("let seen; try { exports.injected = 2; } catch (e) { seen = e.name; } export { seen };", "ReferenceError")]
+    [InlineData("let seen; try { eval('module.exports = {}'); } catch (e) { seen = e.name; } export { seen };", "ReferenceError")]
+    [InlineData("export const seen = typeof this + ',' + typeof arguments;", "undefined,undefined")]
+    [InlineData("const f = () => this; export const seen = typeof f();", "undefined")]
+    public async Task AGraphPreview1RefusedRunsAsEcmaScriptSays(string source, string expected)
+    {
+        var host = new Host { ["mem:/main"] = source, ["mem:/other"] = "export const o = 1;" };
+        using var realm = ModuleRealm(out var map, host);
+
+        var main = await host.Load(realm, map, "./main");
+        main.Evaluate();
+        host.RunUntilIdle(realm);
+        Assert.Equal(JsModuleStatus.Evaluated, main.Status);
+        Assert.Equal(expected, realm.GetProperty(main.GetNamespace(), "seen").AsString);
     }
 
     [Theory]
@@ -68,7 +77,9 @@ public class BroilerJsModuleAdapterTests
     [InlineData("const o = { module: 1, exports: 2 }; export const k = o.module + o.exports;")]
     [InlineData("export const f = function () { return typeof this + typeof arguments; };")]
     [InlineData("export class C { field = this; method() { return this; } }")]
+    // Near misses for the one refusal: neither is a call of import().
     [InlineData("export const meta = typeof import.meta;")]
+    [InlineData("const o = { import: 1 }; export const k = o.import;")]
     public async Task ANearMissIsNotRefused(string source)
     {
         var host = new Host { ["mem:/main"] = source, ["mem:/other"] = "export const o = 1;" };
@@ -80,27 +91,35 @@ public class BroilerJsModuleAdapterTests
         Assert.Equal(JsModuleStatus.Evaluated, main.Status);
     }
 
+    /// <summary>
+    /// Each module's top-level var and function declarations are its own, not the global object's:
+    /// on Broiler.JS 0.1.0-preview.1 these graphs shared one global binding and were refused.
+    /// </summary>
     [Theory]
-    // Broiler.JS 0.1.0-preview.1 binds a module's top-level var and function declarations on the
-    // realm's global object, so modules that share such a name would share one binding.
-    [InlineData("var count = 1; export function get() { return count; }", "import { get } from './dep'; var count = 99; export const seen = get() + ':' + count;", "'count'")]
-    [InlineData("function helper() { return 'dep'; } export const k = helper();", "import { k } from './dep'; function helper() { return 'main'; } export const seen = k + helper();", "'helper'")]
-    [InlineData("var secret = 1; export const k = 1;", "import { k } from './dep'; export const seen = typeof secret;", "'secret'")]
-    [InlineData("if (true) { var secret = 1; } export const k = 1;", "import { k } from './dep'; export const seen = typeof secret;", "'secret'")]
-    [InlineData("export const k = 1;", "import { k } from './dep'; function Map() {} export const seen = k;", "'Map'")]
-    public async Task ATopLevelVarThatTwoModulesOrTheGlobalObjectWouldShareIsRefused(string dep, string main, string reason)
+    [InlineData("var count = 1; export function get() { return count; }", "import { get } from './dep'; var count = 99; export const seen = get() + ':' + count;", "1:99")]
+    [InlineData("function helper() { return 'dep'; } export const k = helper();", "import { k } from './dep'; function helper() { return 'main'; } export const seen = k + helper();", "depmain")]
+    [InlineData("var secret = 1; export const k = 1;", "import { k } from './dep'; export const seen = typeof secret;", "undefined")]
+    [InlineData("if (true) { var secret = 1; } export const k = 1;", "import { k } from './dep'; export const seen = typeof secret;", "undefined")]
+    [InlineData("export const k = 1;", "import { k } from './dep'; function Map() {} export const seen = k + ':' + (Map === globalThis.Map);", "1:false")]
+    public async Task ModulesKeepTheirOwnTopLevelVarAndFunctionBindings(string dep, string main, string expected)
     {
         var host = new Host { ["mem:/main"] = main, ["mem:/dep"] = dep };
         using var realm = ModuleRealm(out var map, host);
 
-        var failure = await Assert.ThrowsAsync<JsModuleException>(() => host.Load(realm, map, "./main"));
-        Assert.Equal(JsModulePhase.Link, failure.Phase);
-        Assert.Contains(reason, failure.Message);
-        Assert.Contains("global object", failure.Message);
+        var root = await host.Load(realm, map, "./main");
+        root.Evaluate();
+        host.RunUntilIdle(realm);
+        Assert.Equal(JsModuleStatus.Evaluated, root.Status);
+        Assert.Equal(expected, realm.GetProperty(root.GetNamespace(), "seen").AsString);
+
+        var globals = realm.OwnPropertyNames(realm.Global);
+        foreach (var name in new[] { "count", "helper", "secret" })
+            Assert.DoesNotContain(name, globals);
+        Assert.True(realm.EvaluateHostScript("typeof Map === 'function' && Map.name === 'Map'", "test:map-intact").AsBoolean);
     }
 
     [Fact]
-    public async Task ATopLevelVarIsCheckedAgainstModulesLinkedEarlier()
+    public async Task ATopLevelVarOfOneModuleIsInvisibleToModulesLinkedLater()
     {
         var host = new Host
         {
@@ -111,19 +130,18 @@ public class BroilerJsModuleAdapterTests
         };
         using var realm = ModuleRealm(out var map, host);
 
-        var first = await host.Load(realm, map, "./first");
-        first.Evaluate();
-        host.RunUntilIdle(realm);
-        Assert.Equal(JsModuleStatus.Evaluated, first.Status);
+        var answers = new List<string>();
+        foreach (var (name, export) in new[] { ("first", "k"), ("second", "k"), ("reader", "seen"), ("own", "seen") })
+        {
+            var module = await host.Load(realm, map, "./" + name);
+            module.Evaluate();
+            host.RunUntilIdle(realm);
+            Assert.Equal(JsModuleStatus.Evaluated, module.Status);
+            answers.Add(realm.ToJsString(realm.GetProperty(module.GetNamespace(), export)));
+        }
 
-        Assert.Contains("'shared'", (await Assert.ThrowsAsync<JsModuleException>(() => host.Load(realm, map, "./second"))).Message);
-        Assert.Contains("'shared'", (await Assert.ThrowsAsync<JsModuleException>(() => host.Load(realm, map, "./reader"))).Message);
-
-        // A module's own top-level lexical declaration of the name is its own binding, not the global one.
-        var own = await host.Load(realm, map, "./own");
-        own.Evaluate();
-        host.RunUntilIdle(realm);
-        Assert.Equal(3d, realm.GetProperty(own.GetNamespace(), "seen").AsNumber);
+        Assert.Equal(new[] { "1", "2", "undefined", "3" }, answers);
+        Assert.DoesNotContain("shared", realm.OwnPropertyNames(realm.Global));
     }
 
     [Fact]
@@ -207,7 +225,7 @@ public class BroilerJsModuleAdapterTests
         return realm;
     }
 
-    private sealed class Host : Dictionary<string, string>, IJsModuleHost
+    internal sealed class Host : Dictionary<string, string>, IJsModuleHost
     {
         private readonly ConcurrentQueue<Action> _tasks = new();
 
