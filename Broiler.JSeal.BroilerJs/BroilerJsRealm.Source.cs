@@ -25,7 +25,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// <see cref="JsCapabilities.ClassicScriptSource"/> and <see cref="JsCapabilities.GuestEval"/>,
 /// because a page's text is not knowable then â€” and the contract is shaped so that it can.
 /// </remarks>
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     /// <inheritdoc />
     public JsValue EvaluateHostScript(string source, string label)
@@ -74,25 +74,103 @@ internal sealed partial class BroilerJsRealm
         return Evaluate(source, label);
     }
 
+    /// <summary>Evaluates under the selected source identity, which the engine also sees.</summary>
+    /// <remarks>
+    /// The identity is the compiler location, so it appears in this engine's own frames. Guest
+    /// throws escaping here carry it, and a parse failure in this text also carries its line when
+    /// the engine's report of it can be trusted.
+    /// </remarks>
     private JsValue Evaluate(string source, string label)
     {
+        var sourceLabel = _options.SourceLabelFor(label);
         using var scope = Enter();
 
         try
         {
-            return BroilerJsMarshal.Wrap(_context.Eval(source, label));
+            return BroilerJsMarshal.Wrap(_context.Eval(source, sourceLabel));
         }
         catch (JSException engineException)
         {
-            throw Translate(engineException);
+            throw Translate(engineException, sourceLabel, source);
         }
+    }
+
+    /// <summary>
+    /// The line of a parse failure in the evaluated text, read from the engine's compile frame, or
+    /// null when that line cannot be trusted.
+    /// </summary>
+    /// <remarks>
+    /// The pinned engine exposes no structured parse position. A parse failure's trace is its message
+    /// followed by one frame, <c>at Compile:{location}:{line},{column}</c>. Run-time throws start with
+    /// a different frame, and a guest <c>eval</c> or <c>Function</c> compiles under another location
+    /// with a further frame after it, so only a sole compile frame under this evaluation's identity
+    /// counts. Line 0 means the parser had no position, such as end of input. The frame's line is not
+    /// always the failure's: a lexer failure, such as an unterminated string, leaves it at the line
+    /// where the token began scanning, so when the message ends in the parser's own
+    /// <c>at {line}, {column}</c> the two must agree. The pinned lexer also counts only LF and CRLF
+    /// as a line break, in code, comments, strings and templates alike, while ECMAScript also counts a
+    /// lone CR, U+2028 and U+2029. Text containing any of those reports no line rather than a
+    /// plausible wrong one.
+    /// </remarks>
+    private static int? CompileFailureLine(string message, string? trace, string sourceLabel, string source)
+    {
+        if (trace is null || !trace.StartsWith(message, StringComparison.Ordinal) || HasMiscountedLines(source))
+            return null;
+
+        var frame = trace.AsSpan(message.Length).Trim();
+        var prefix = "at Compile:" + sourceLabel + ":";
+
+        if (!frame.StartsWith(prefix, StringComparison.Ordinal) || frame.IndexOfAny('\r', '\n') >= 0)
+            return null;
+
+        frame = frame[prefix.Length..];
+        var comma = frame.IndexOf(',');
+
+        if (comma <= 0 || !int.TryParse(frame[..comma], out var line) || line <= 0)
+            return null;
+
+        return ReportedParserLine(message) is not { } reported || reported == line ? line : null;
+    }
+
+    /// <summary>The line of a message ending in the parser's <c> at {line}, {column}</c>.</summary>
+    private static int? ReportedParserLine(string message)
+    {
+        var text = message.AsSpan().TrimEnd();
+        var comma = text.LastIndexOf(", ", StringComparison.Ordinal);
+        if (comma < 0 || !int.TryParse(text[(comma + 2)..], out _))
+            return null;
+
+        var at = text[..comma].LastIndexOf(" at ", StringComparison.Ordinal);
+        return at >= 0 && int.TryParse(text[(at + 4)..comma], out var line) ? line : null;
+    }
+
+    /// <summary>
+    /// Whether the text holds a line terminator the pinned lexer does not count as ECMAScript does:
+    /// a CR not followed by LF, U+2028 or U+2029, wherever it appears.
+    /// </summary>
+    private static bool HasMiscountedLines(string source)
+    {
+        for (var i = 0; i < source.Length; i++)
+        {
+            switch (source[i])
+            {
+                case '\u2028' or '\u2029':
+                    return true;
+                case '\r' when i + 1 == source.Length || source[i + 1] != '\n':
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Apply forced strictness only to host-authored source.</summary>
     /// <remarks>
-    /// The directive stays on the first source line to preserve subsequent line numbers. Classic scripts
-    /// and dynamic source bypass this helper. Source-authorization tests pin these boundaries on both
-    /// providers; labels are diagnostic metadata, not authorization tokens.
+    /// The pinned engine has no strictness option, so the directive is prepended on the first source
+    /// line. Line numbers survive; engine-reported columns on that first line shift by the directive's
+    /// 13 characters, which is why this provider reports no <see cref="JsEngineException.SourceColumn"/>.
+    /// Classic scripts and dynamic source bypass this helper. Labels are diagnostic metadata, not
+    /// authorization tokens.
     /// </remarks>
     private string ApplyStrictMode(string source) =>
         _forceStrictMode ? "\"use strict\";" + source : source;

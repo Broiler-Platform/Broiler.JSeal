@@ -26,8 +26,16 @@
     <WarningsAsErrors>$(WarningsAsErrors);CA2013;CS8073</WarningsAsErrors>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8620;CS8622;CS8625;CS8631;CS8632;CS8765;CS8767;CS9113;CA1416;CA2255;SYSLIB0013</NoWarn>
+  <!--
+    The one suppression left from the extraction. The nullable family (CS8600-CS8767) is no longer
+    suppressed anywhere (J15, J16), and CS9113, CA1416 and SYSLIB0013 were dropped once no project
+    raised them. CA2255 stays: the providers register themselves from [ModuleInitializer] methods,
+    which is the intended use in a library. The reference-free contracts need none of it, so they
+    inherit nothing here; a suppression they one day need belongs in Broiler.JSeal.csproj with its
+    reason.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Broiler.JSeal'">
+    <NoWarn>$(NoWarn);CA2255</NoWarn>
   </PropertyGroup>
 
 </Project>

@@ -53,8 +53,11 @@ internal static class BroilerJsMarshal
 
         // Symbol, BigInt, Object, Function and Array are all handles over the engine's own value,
         // minted by Wrap below, so unwrapping them is the identity. A handle whose reference came
-        // from another provider is a host bug rather than a page one, and the cast says so.
-        _ => (JSValue)JsProviderValue.ReferenceOf(value)!,
+        // from another provider is a host bug rather than a page one; it is refused with the same
+        // JsEngineException the VM provider raises for one (B06), where a bare cast used to raise an
+        // InvalidCastException that no host catch block is written against.
+        _ => JsProviderValue.ReferenceOf(value) as JSValue
+            ?? throw new JsEngineException("the value was minted by a different JavaScript engine and means nothing here"),
     };
 
     /// <summary>

@@ -7,7 +7,8 @@ namespace Broiler.JSeal;
 /// <summary>Create realm values and perform conversions requiring a provider.</summary>
 /// <remarks>
 /// JsValue exposes cheap handle inspections. ToJsString and ToNumber may execute guest coercion;
-/// ToBoolean needs the provider for opaque BigInt truthiness but does not execute guest code.
+/// ToBoolean and IsStrictlyEqual need the provider for an opaque BigInt's truthiness and value but do
+/// not execute guest code.
 /// </remarks>
 public interface IJsValues
 {
@@ -99,9 +100,10 @@ public interface IJsValues
     /// finds.
     /// </para>
     /// </remarks>
+    /// <param name="value">The value to test; any kind is accepted.</param>
     /// <param name="bytes">
-    /// A snapshot the caller owns; empty when the answer is <see langword="false"/> or the buffer is
-    /// detached.
+    /// A snapshot the caller owns when the answer is <see langword="true"/>, empty when the buffer is
+    /// detached; <see langword="null"/> when the answer is <see langword="false"/>.
     /// </param>
     bool TryGetArrayBufferBytes(JsValue value, [NotNullWhen(true)] out byte[]? bytes);
 
@@ -135,6 +137,58 @@ public interface IJsValues
     /// </para>
     /// </remarks>
     bool ToBoolean(JsValue value);
+
+    /// <summary>
+    /// ECMAScript <c>IsStrictlyEqual</c> (<c>===</c>). Runs no page script.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>For every kind but one this is <see cref="JsValue.op_Equality"/>, which is already
+    /// <c>===</c> there:</b> NaN is unequal to itself, <c>+0</c> equals <c>-0</c>, strings compare by
+    /// code unit, and symbols and objects by identity. The exception is again
+    /// <see cref="JsValueKind.BigInt"/>. Two BigInts are strictly equal when they are the same
+    /// mathematical integer, but the handle's operator compares the references BigInt handles carry,
+    /// and whether two handles for one value share a reference is the provider's business: one may
+    /// hand back the engine's own value, another a new box per crossing. So a <see langword="true"/>
+    /// from the operator is reliable for a BigInt and a <see langword="false"/> is not; this member
+    /// answers both. A BigInt never equals a Number here, as in the language.
+    /// </para>
+    /// <para>
+    /// <b>The handle operator, <see cref="JsValue.Equals(JsValue)"/> and
+    /// <see cref="JsValue.GetHashCode"/> keep comparing BigInt handles by reference,</b> deliberately:
+    /// changing them would change the hash of every dictionary and list a host keys on a handle, and
+    /// they cannot see inside a BigInt without a provider anyway. A host that needs a BigInt's value as
+    /// a key should key on <see cref="ToJsString"/>'s answer.
+    /// </para>
+    /// <para>
+    /// <b><see cref="JsValue.Missing"/> is <c>undefined</c> here:</b> it is no JavaScript value,
+    /// and <c>undefined</c> is what the language has for a value nobody supplied (and what both
+    /// providers make of it in <see cref="IJsClone.Clone"/>). So it is strictly equal to
+    /// <see cref="JsValue.Undefined"/> and to itself, although the handle operator tells the two
+    /// apart.
+    /// </para>
+    /// <para>
+    /// A provider refuses a BigInt handle another engine minted with <see cref="JsEngineException"/>, as
+    /// its <see cref="ToBoolean"/> does. A provider that predates this member and does not implement it
+    /// gets this default body, which cannot look inside a handle: the operator's answer wherever that
+    /// is <c>===</c>, and <see cref="NotSupportedException"/> for two distinct BigInt handles, which it
+    /// cannot decide. Both registered providers implement it.
+    /// </para>
+    /// </remarks>
+    bool IsStrictlyEqual(JsValue left, JsValue right)
+    {
+        if (left.IsMissing)
+            left = JsValue.Undefined;
+
+        if (right.IsMissing)
+            right = JsValue.Undefined;
+
+        if (left.Kind != JsValueKind.BigInt || right.Kind != JsValueKind.BigInt || left == right)
+            return left == right;
+
+        throw new NotSupportedException(
+            "this provider does not implement IJsValues.IsStrictlyEqual, so two BigInt handles cannot be compared by value");
+    }
 }
 
 /// <summary>
@@ -189,9 +243,22 @@ public interface IJsMembers
 public interface IJsCalls
 {
     /// <summary>Calls a function.</summary>
+    /// <remarks>
+    /// A handle whose <see cref="JsValue.IsFunction"/> is false is refused before any guest code runs,
+    /// including a noncallable Proxy's traps: the provider throws <see cref="JsEngineException"/>
+    /// carrying the realm's <c>TypeError</c>. <see cref="Construct"/> refuses the same handles. The
+    /// check comes first, so a non-function handle minted by another realm of the same provider gets
+    /// this <c>TypeError</c> rather than a foreign-handle refusal; either way nothing crosses.
+    /// </remarks>
     JsValue Invoke(JsValue function, JsValue thisValue, ReadOnlySpan<JsValue> arguments = default);
 
     /// <summary>Calls a constructor with <c>new</c>.</summary>
+    /// <remarks>
+    /// A handle whose <see cref="JsValue.IsFunction"/> is false is refused before any guest code runs,
+    /// as <see cref="Invoke"/> refuses it: <see cref="JsEngineException"/> carrying the realm's
+    /// <c>TypeError</c>. A function that is not a constructor reaches the engine, which raises its own
+    /// <c>TypeError</c>.
+    /// </remarks>
     JsValue Construct(JsValue constructor, ReadOnlySpan<JsValue> arguments = default);
 
     /// <summary>
@@ -260,15 +327,21 @@ public interface IJsJobs
 /// calling EvaluateClassicScript. EvaluateDynamicSource requires GuestEval, and providers also block
 /// guest eval and Function compilation when that capability is absent. Host/classic evaluation does
 /// not exempt guest callbacks from this restriction. None of these methods executes module graphs.
+/// <para>
+/// Every <c>label</c> is a diagnostic source identity, selected by
+/// <see cref="JsRealmOptions.SourceLabelFor"/> when blank. It never grants permission or changes
+/// strictness. A guest throw escaping these members carries the selected identity in
+/// <see cref="JsEngineException.SourceLabel"/>; a syntax error also carries its line when known.
+/// Broiler.JS also gives the label to its compiler, so it appears in that engine's stack text.
+/// The pinned Broiler.VM eval request carries only source bytes and always runs entry
+/// <c>main</c>, so the VM provider keeps the identity in JSEAL and has no guest stack text.
+/// </para>
 /// </remarks>
 public interface IJsSource
 {
     /// <summary>Evaluate trusted host-authored source; ForceStrictMode applies here.</summary>
     /// <param name="source">JavaScript supplied by the host.</param>
-    /// <param name="label">
-    /// Diagnostic label. Broiler.JS passes it to Eval; VM currently uses a fixed compiler unit name.
-    /// Consistent source identity is tracked by roadmap slice J17.
-    /// </param>
+    /// <param name="label">Diagnostic source identity; see the interface remarks.</param>
     JsValue EvaluateHostScript(string source, string label);
 
     /// <summary>Evaluate a classic script after the host has authorized it.</summary>

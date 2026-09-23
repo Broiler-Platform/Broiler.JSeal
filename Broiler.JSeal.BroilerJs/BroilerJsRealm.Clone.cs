@@ -37,7 +37,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// whatever realm the thread last touched â€” on the worker's delivery path, plausibly the page's.
 /// </para>
 /// </remarks>
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     /// <inheritdoc />
     /// <remarks>

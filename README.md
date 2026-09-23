@@ -83,7 +83,10 @@ pwsh -NoProfile -File eng/test-package-consumer.ps1
 ```
 
 The [package-consumer check](eng/package-consumer/README.md) restores from an isolated local feed
-into fresh caches and runs outside the source tree. CI includes it on Windows and Linux.
+into fresh caches and runs outside the source tree, for each provider alone and both together, and
+gates engine package versions (Node.js 24 required). CI includes it on Windows and Linux. With
+`-CandidateFeed <dir> -CandidateVersion Broiler.VM=<version>` it evaluates a candidate upstream set
+without changing the pins or publishing anything.
 
 ## Documentation
 
@@ -92,7 +95,7 @@ into fresh caches and runs outside the source tree. CI includes it on Windows an
 - [Human Review Record](HUMAN_REVIEW.md) — Review scope; human approval remains pending
 
 Validate local documentation links and project examples with `python diagnostics/J14/check_docs.py`.
-This optional check uses Python 3.9+ and ripgrep; it does not run behavioral tests or fetch URLs.
+This optional check uses Python 3.9+ and ripgrep, falling back to `git ls-files` without it; it does not run behavioral tests or fetch URLs.
 
 ## License
 

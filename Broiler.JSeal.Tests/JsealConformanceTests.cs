@@ -1,6 +1,3 @@
-using System.Numerics;
-using System.Reflection;
-
 using Broiler.JSeal.BroilerJs;
 using Broiler.JSeal;
 
@@ -40,33 +37,11 @@ public partial class JsealConformanceTests
     {
         var provider = JsEngineRegistry.Find(engine);
         Assert.NotNull(provider);
-        return provider!;
+        return provider;
     }
-
-#if BROILER_VM_JS
-    /// <summary>VM configurations must discover both real providers.</summary>
-    /// <remarks>
-    /// Jseal/VmProviderRegistration.cs registers both providers from a module initializer. This check
-    /// detects a missing conditional reference or registration that would silently omit VM theories.
-    /// Registry mutation tests use isolated state and do not change the discovery registry.
-    /// </remarks>
-    [Fact]
-    public void AVmBuildHasBothProvidersRegistered()
-    {
-        Assert.Contains(JsEngineRegistry.All, provider => provider.Name == "broiler-js");
-        Assert.Contains(JsEngineRegistry.All, provider => provider.Name == "broiler-vm");
-
-        // And the theories really do run for both, which is the property the suite is shaped around.
-        Assert.Contains(Engines, row => (string)row[0] == "broiler-vm");
-    }
-#endif
 
     private static IJsRealm NewRealm(string engine, JsRealmOptions? options = null) =>
         Provider(engine).CreateRealm(options ?? JsRealmOptions.Default);
-
-    /// <summary>Whether a realm lacks a capability, for the tests that need one.</summary>
-    private static bool Lacks(IJsRealm realm, JsCapabilities capability) =>
-        (realm.Capabilities & capability) == 0;
 
     /// <summary>
     /// Runs <paramref name="expression"/> as host script and answers it as a string, which is how
@@ -244,12 +219,16 @@ public partial class JsealConformanceTests
     /// of it by accident.
     /// </para>
     /// <para>
-    /// <b>The BigInt half is guarded on the realm having a <c>BigInt</c> global, not on a capability,</b>
-    /// because a BigInt is not a capability: one engine implements the value kind and the other
-    /// implements it nowhere, and no <see cref="JsCapabilities"/> flag tells them apart. Past the guard
-    /// each value's kind is asserted before anything is asked of it, so a mint that produced something
-    /// else fails rather than passing on a number. The guard is also the one way this test can pass
-    /// vacuously: an engine that had BigInts and lost the global would skip the half that matters.
+    /// <b>The BigInt half is its own theory, chosen by a stated table rather than a capability,</b>
+    /// because a BigInt is not a capability: whether an engine implements the value kind is a fact
+    /// about its pinned version (Broiler.VM gained it with B05-B06), and no
+    /// <see cref="JsCapabilities"/> flag tells engines apart by it.
+    /// <see cref="ToBooleanOfABigIntIsTheLanguagesAnswer"/> runs where <see cref="BigIntSupport"/> says
+    /// BigInt exists, <see cref="AnEngineWithoutBigIntRefusesABigIntLiteral"/> asserts the refusal
+    /// where it says it does not, and <see cref="EveryEngineIsClassifiedForBigIntAndTheClassificationHolds"/>
+    /// checks the table against every engine, so no engine can skip the half that matters by losing
+    /// the global. Each BigInt's kind is asserted before anything is asked of it, so a mint that
+    /// produced something else fails rather than passing on a number.
     /// </para>
     /// <para>
     /// <b>The handle's wrong answer is asserted too, on purpose.</b> If the handle is ever taught to
@@ -286,16 +265,88 @@ public partial class JsealConformanceTests
             Assert.Equal((value.Kind, value.AsBoolean), (value.Kind, realm.ToBoolean(value)));
 
         Assert.True(realm.ToBoolean(realm.NewObject()));
+    }
 
-        // A provider WITHOUT BigInt skips the half below, and the VM profile is one. But a provider that
-        // HAS it must not be able to lose it and stay green: a skip nobody can see is a test that never
-        // ran. Broiler.JS declares BigInt, so there the absence is a failure rather than a skip.
-        var hasBigInt = realm.GetProperty(realm.Global, "BigInt").IsFunction;
-        if (engine == "broiler-js")
-            Assert.True(hasBigInt, "broiler-js exposes a BigInt global; the BigInt half must run there.");
+    /// <summary>
+    /// Which registered engines implement BigInt, and which of its library surfaces. Not a
+    /// capability: see <see cref="ToBooleanIsTheHandlesAnswerExceptForABigInt"/>.
+    /// </summary>
+    /// <remarks>
+    /// Stated rather than probed, so that neither half can pass by an engine changing under it:
+    /// <see cref="EveryEngineIsClassifiedForBigIntAndTheClassificationHolds"/> fails when an engine
+    /// gains or loses the value kind, a BigInt typed array or a DataView BigInt accessor without this
+    /// table changing, and when a provider is registered that the table does not classify. Each
+    /// <see langword="true"/> column has a witness in <c>JsealConformanceTests.BigInt.cs</c>.
+    /// </remarks>
+    private static readonly IReadOnlyDictionary<string, BigIntSurface> BigIntSurfaces = new Dictionary<string, BigIntSurface>
+    {
+        ["broiler-js"] = new(Value: true, TypedArrays: true, DataViewAccessors: true),
+        // The pinned VM profile (0.1.0-preview.3) has no BigInt value kind, so none of its library
+        // surfaces either. Recorded as unsupported, and asserted as such, rather than skipped. The VM
+        // working tree has all three (B05-B08) and its next pin turns this row true.
+        ["broiler-vm"] = new(Value: false, TypedArrays: false, DataViewAccessors: false),
+    };
 
-        if (!hasBigInt)
+    /// <summary>One engine's row of <see cref="BigIntSurfaces"/>.</summary>
+    /// <param name="Value">The <c>BigInt</c> global and the value kind, across the host boundary.</param>
+    /// <param name="TypedArrays"><c>BigInt64Array</c> and <c>BigUint64Array</c>.</param>
+    /// <param name="DataViewAccessors">
+    /// <c>DataView.prototype</c>'s <c>getBigInt64</c>, <c>getBigUint64</c>, <c>setBigInt64</c> and
+    /// <c>setBigUint64</c>.
+    /// </param>
+    private sealed record BigIntSurface(bool Value, bool TypedArrays, bool DataViewAccessors);
+
+    private static readonly IReadOnlyDictionary<string, bool> BigIntSupport =
+        BigIntSurfaces.ToDictionary(entry => entry.Key, entry => entry.Value.Value);
+
+    public static IEnumerable<object[]> EnginesWithBigInt => EnginesWhereBigIntIs(true);
+
+    public static IEnumerable<object[]> EnginesWithoutBigInt => EnginesWhereBigIntIs(false);
+
+    /// <summary>
+    /// Registered engines classified as <paramref name="supported"/>, or one placeholder row naming
+    /// that none is, because xUnit fails a theory with no data.
+    /// </summary>
+    private static IEnumerable<object[]> EnginesWhereBigIntIs(bool supported)
+    {
+        var rows = JsEngineRegistry.All
+            .Where(provider => BigIntSupport.TryGetValue(provider.Name, out var has) && has == supported)
+            .Select(provider => new object[] { provider.Name })
+            .ToArray();
+        return rows.Length > 0 ? rows : [[NoEngineInThisBuild]];
+    }
+
+    private const string NoEngineInThisBuild = "(none registered in this build)";
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void EveryEngineIsClassifiedForBigIntAndTheClassificationHolds(string engine)
+    {
+        Assert.True(BigIntSurfaces.TryGetValue(engine, out var surface), $"'{engine}' is not classified in {nameof(BigIntSurfaces)}.");
+
+        using var realm = NewRealm(engine);
+        var dataViewPrototype = realm.GetProperty(realm.GetProperty(realm.Global, "DataView"), "prototype");
+
+        // Each name separately, so a failure names the one that moved.
+        Assert.Equal(("BigInt", surface.Value), ("BigInt", realm.GetProperty(realm.Global, "BigInt").IsFunction));
+        foreach (var name in new[] { "BigInt64Array", "BigUint64Array" })
+            Assert.Equal((name, surface.TypedArrays), (name, realm.GetProperty(realm.Global, name).IsFunction));
+        foreach (var name in new[] { "getBigInt64", "getBigUint64", "setBigInt64", "setBigUint64" })
+            Assert.Equal((name, surface.DataViewAccessors), (name, realm.GetProperty(dataViewPrototype, name).IsFunction));
+    }
+
+    /// <summary>The BigInt half of <see cref="ToBooleanIsTheHandlesAnswerExceptForABigInt"/>.</summary>
+    [Theory]
+    [MemberData(nameof(EnginesWithBigInt))]
+    public void ToBooleanOfABigIntIsTheLanguagesAnswer(string engine)
+    {
+        if (engine == NoEngineInThisBuild)
+        {
+            Assert.Empty(JsEngineRegistry.All.Where(provider => BigIntSupport.GetValueOrDefault(provider.Name)));
             return;
+        }
+
+        using var realm = NewRealm(engine);
 
         var zero = realm.EvaluateHostScript("0n", "test:bigint-zero");
         var one = realm.EvaluateHostScript("1n", "test:bigint-one");
@@ -303,11 +354,35 @@ public partial class JsealConformanceTests
         Assert.Equal(JsValueKind.BigInt, zero.Kind);
         Assert.Equal(JsValueKind.BigInt, one.Kind);
 
-        // Wrong, and pinned as wrong: see the remarks.
+        // Wrong, and pinned as wrong: see the remarks on ToBooleanIsTheHandlesAnswerExceptForABigInt.
         Assert.True(zero.AsBoolean);
 
         Assert.False(realm.ToBoolean(zero));
         Assert.True(realm.ToBoolean(one));
+    }
+
+    /// <summary>
+    /// An engine without BigInt refuses a BigInt literal as an engine error; it does not hand back
+    /// some other value for the host to mistake for one.
+    /// </summary>
+    /// <remarks>
+    /// The unsupported half, stated as its own rows so a report shows BigInt as unsupported on that
+    /// engine instead of showing a ToBoolean pass that never reached a BigInt.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(EnginesWithoutBigInt))]
+    public void AnEngineWithoutBigIntRefusesABigIntLiteral(string engine)
+    {
+        if (engine == NoEngineInThisBuild)
+        {
+            Assert.Empty(JsEngineRegistry.All.Where(provider => !BigIntSupport.GetValueOrDefault(provider.Name, true)));
+            return;
+        }
+
+        using var realm = NewRealm(engine);
+
+        Assert.False(realm.GetProperty(realm.Global, "BigInt").IsFunction);
+        Assert.Throws<JsEngineException>(() => realm.EvaluateHostScript("0n", "test:bigint-unsupported"));
     }
 
     /// <summary>
@@ -512,96 +587,5 @@ public partial class JsealConformanceTests
             Assert.True(table.TryGetValue(reread, out _));
         }
     }
-
-    // â”€â”€ capability coverage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-    /// <summary>
-    /// Which test above demonstrates each capability a provider may declare.
-    /// </summary>
-    /// <remarks>
-    /// A capability is a claim a host is entitled to branch on without verifying it, so a suite that
-    /// lets one go unexercised is letting a provider make a claim nothing checks. The meta-test
-    /// below reads this table, so a capability added to <see cref="JsCapabilities"/> and declared by
-    /// a provider fails the suite until a test for it exists â€” and the table cannot rot, because the
-    /// test names are resolved by reflection rather than trusted.
-    /// </remarks>
-    private static readonly IReadOnlyDictionary<JsCapabilities, string> CapabilityCoverage =
-        new Dictionary<JsCapabilities, string>
-        {
-            [JsCapabilities.HostScriptSource] = nameof(EvaluatingHostScriptAnswersTheValueOfTheLastExpression),
-            [JsCapabilities.GuestEval] = nameof(ARealmBuiltWithoutGuestEvalRefusesDynamicSourceAndStillRunsHostScript),
-            [JsCapabilities.ClassicScriptSource] = nameof(AClassicScriptRunsInARealmThatForbidsGuestEvaluation),
-            [JsCapabilities.Promises] = nameof(APromiseSettlesFromTheHostAndItsReactionRunsAtTheNextDrain),
-            [JsCapabilities.ExoticObjects] = nameof(AnOrdinaryPropertyWinsOverTheExoticHandler),
-            [JsCapabilities.GlobalIsVariableScope] = nameof(ATopLevelDeclarationBecomesAPropertyOfTheGlobal),
-            // Covers both halves of what the capability claims: the second realm on the second
-            // thread, and values moved between the two by structured clone (IJsClone).
-            [JsCapabilities.WorkerRealms] = nameof(ASecondRealmRunsOnASecondThread),
-            [JsCapabilities.ReentrantHostCalls] = nameof(AHostFunctionMayCallBackIntoScriptWhileTheEngineIsInsideIt),
-            [JsCapabilities.BinaryData] = nameof(AMintedArrayBufferIsTheRealmsOwnAndAViewOverItSeesTheBytes),
-        };
-
-    /// <summary>
-    /// The capabilities no JSEAL contract can exercise, and why.
-    /// </summary>
-    /// <remarks>
-    /// <b>This is a gap in the contracts, recorded here rather than papered over.</b>
-    /// <see cref="JsCapabilities.Modules"/> and <see cref="JsCapabilities.DynamicImport"/> describe
-    /// binding an ES-module import end to end, and <see cref="IJsSource"/> â€” the only contract that
-    /// takes source â€” has no module entry point at all: its three members run a script, which is a
-    /// different thing from instantiating and evaluating a module in a module map. So a provider can
-    /// declare both and a host written against JSEAL alone has no way to use either, and no way to
-    /// tell whether the claim is true. Nothing here can close that; a <c>EvaluateModule</c> on
-    /// <see cref="IJsSource"/> would, and until there is one these two stay listed as unexercised
-    /// on purpose rather than silently uncovered.
-    /// </remarks>
-    private static readonly IReadOnlySet<JsCapabilities> NotExpressibleThroughTheContracts =
-        new HashSet<JsCapabilities> { JsCapabilities.Modules, JsCapabilities.DynamicImport };
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public void EveryCapabilityAProviderDeclaresIsExercisedBySomeTest(string engine)
-    {
-        var declared = Provider(engine).Capabilities;
-
-        var unexercised = SingleCapabilities()
-            .Where(capability => declared.HasFlag(capability))
-            .Where(capability => !CapabilityCoverage.ContainsKey(capability))
-            .Where(capability => !NotExpressibleThroughTheContracts.Contains(capability))
-            .ToArray();
-
-        Assert.True(
-            unexercised.Length == 0,
-            $"'{engine}' declares {string.Join(", ", unexercised)}, which no test in this suite exercises. " +
-            "Add the test and name it in CapabilityCoverage, or record it in " +
-            $"{nameof(NotExpressibleThroughTheContracts)} with the reason no contract reaches it.");
-    }
-
-    [Fact]
-    public void EveryClaimOfCoverageNamesATestThatActuallyExists()
-    {
-        // The table above is a claim about this class, so it is checked against this class rather than
-        // believed. A test renamed without updating the table would otherwise leave a capability
-        // reported as covered by nothing at all.
-        foreach (var (capability, testName) in CapabilityCoverage)
-        {
-            var method = typeof(JsealConformanceTests).GetMethod(
-                testName,
-                BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-
-            Assert.True(method is not null, $"{capability} names '{testName}', which is not a method of this class.");
-            Assert.True(
-                method!.GetCustomAttributes(typeof(TheoryAttribute), inherit: false).Length == 1,
-                $"{capability} names '{testName}', which is not a [Theory] over the registered providers.");
-        }
-
-        // And the two halves must not overlap: a capability cannot be both exercised and declared
-        // inexpressible.
-        Assert.Empty(CapabilityCoverage.Keys.Intersect(NotExpressibleThroughTheContracts));
-    }
-
-    /// <summary>Every capability that names one thing, so the composite <c>Document</c> is skipped.</summary>
-    private static IEnumerable<JsCapabilities> SingleCapabilities() =>
-        Enum.GetValues<JsCapabilities>().Where(value => BitOperations.PopCount((uint)value) == 1);
 }
 

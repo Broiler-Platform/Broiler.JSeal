@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace Broiler.JSeal.BroilerJs;
 
@@ -18,8 +19,10 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// <summary>Optional host evidence for static and dynamic module support.</summary>
     /// <remarks>
     /// Null, false or a throwing callback leaves Modules and DynamicImport absent. A true result advertises
-    /// both flags. JSEAL has no module-loader or module-evaluation contract; hosts using these flags must
-    /// provide and validate their own integration. Referencing the Modules package alone is not evidence
+    /// both flags. The flags then describe the host's own module integration, not JSEAL's: the
+    /// <see cref="IJsModules"/> contract is reached only through the internal
+    /// <see cref="EnableModuleContract"/> gate until I13 (see <c>docs/jseal.modules.md</c> for the
+    /// pending owner decision on this callback). Referencing the Modules package alone is not evidence
     /// of module execution through JSEAL; that package also supplies ordinary arguments-object support.
     /// </remarks>
     public static Func<bool>? ModuleSupport { get; set; }
@@ -43,7 +46,9 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// protocol <c>BroilerJsExoticObject</c> overrides; <see cref="JsCapabilities.GlobalIsVariableScope"/>
     /// is the engine's defining structural choice, that the <c>JSContext</c> <em>is</em> the global;
     /// <see cref="JsCapabilities.WorkerRealms"/> is a second <c>JSContext</c> on a second thread, which
-    /// is what the bridge's Worker support already builds;
+    /// is what the bridge's Worker support already builds, and <see cref="JsCapabilities.StructuredClone"/>
+    /// is the engine's own structured clone that both it and same-realm messaging use
+    /// (<c>BroilerJsRealm.Clone.cs</c>);
     /// <see cref="JsCapabilities.ReentrantHostCalls"/> is simply how the engine runs â€” a native
     /// function may call <c>InvokeFunction</c> while the engine is inside it, which is what every
     /// event dispatch in the bridge does; and <see cref="JsCapabilities.BinaryData"/> is
@@ -68,6 +73,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
                 JsCapabilities.ExoticObjects |
                 JsCapabilities.GlobalIsVariableScope |
                 JsCapabilities.WorkerRealms |
+                JsCapabilities.StructuredClone |
                 JsCapabilities.ReentrantHostCalls |
                 JsCapabilities.BinaryData;
 
@@ -87,11 +93,31 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
         }
     }
 
+    /// <summary>
+    /// Test-only gate for the I10 module adapter: realms this instance creates implement
+    /// <see cref="IJsModules"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Internal, and reachable only from the assemblies named by <c>InternalsVisibleTo</c>; the
+    /// instance the module initializer registers never sets it. I13 removes it when it publishes the
+    /// module capabilities.
+    /// </para>
+    /// <para>
+    /// <b>It adds no capability.</b> The pinned engine cannot keep every promise
+    /// <see cref="JsCapabilities.Modules"/> makes (live bindings, the namespace exotic object, cyclic
+    /// graphs; see <c>docs/jseal.modules.md</c>), so a gated realm reports the same flags as any
+    /// other realm from this provider, and the adapter refuses at link time the graphs it knows it
+    /// would run wrongly. Adopted realms never implement the interface.
+    /// </para>
+    /// </remarks>
+    internal bool EnableModuleContract { get; init; }
+
     /// <inheritdoc />
     public IJsRealm CreateRealm(JsRealmOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        return new BroilerJsRealm(this, options);
+        return EnableModuleContract ? new BroilerJsModuleRealm(this, options) : new BroilerJsRealm(this, options);
     }
 
     /// <inheritdoc />
@@ -102,7 +128,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// <c>JSContext</c>, so a module context adopts too â€” which is what the bridge's module path
     /// needs, since that is the realm a page's <c>&lt;script type="module"&gt;</c> runs in.
     /// </remarks>
-    public bool TryAdopt(object engineRealm, JsRealmOptions options, out IJsRealm? realm)
+    public bool TryAdopt(object engineRealm, JsRealmOptions options, [NotNullWhen(true)] out IJsRealm? realm)
     {
         ArgumentNullException.ThrowIfNull(options);
 

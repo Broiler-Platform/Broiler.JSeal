@@ -8,8 +8,18 @@ namespace Broiler.JSeal.Vm;
 internal sealed partial class VmRealm
 {
     /// <inheritdoc />
+    /// <remarks>
+    /// A value whose handle is not a function is refused before the crossing, with the realm's
+    /// <c>TypeError</c> carried by a <see cref="JsEngineException"/>: the answer ECMAScript's Call
+    /// gives and the one Broiler.JS gives, rather than the host surface's refusal. The check precedes
+    /// the foreign-realm check, so a non-function handle from another realm gets the same
+    /// <c>TypeError</c>; a function handle from another realm is still refused at the crossing.
+    /// </remarks>
     public JsValue Invoke(JsValue function, JsValue thisValue, ReadOnlySpan<JsValue> arguments = default)
     {
+        if (!function.IsFunction)
+            throw Error(JsErrorKind.TypeError, "the value passed to Invoke is not a function");
+
         var callee = VmMarshal.Unwrap(function);
         var receiver = VmMarshal.Unwrap(thisValue);
         var converted = VmMarshal.UnwrapAll(arguments);
@@ -20,6 +30,9 @@ internal sealed partial class VmRealm
     /// <inheritdoc />
     public JsValue Construct(JsValue constructor, ReadOnlySpan<JsValue> arguments = default)
     {
+        if (!constructor.IsFunction)
+            throw Error(JsErrorKind.TypeError, "the value passed to Construct is not a constructor");
+
         var callee = VmMarshal.Unwrap(constructor);
         var converted = VmMarshal.UnwrapAll(arguments);
 

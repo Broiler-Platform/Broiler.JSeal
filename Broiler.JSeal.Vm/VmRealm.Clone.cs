@@ -1,22 +1,23 @@
 ﻿namespace Broiler.JSeal.Vm;
 
 /// <summary>
-/// <see cref="IJsClone"/>: structured clone, which this engine does not have.
+/// <see cref="IJsClone"/>: structured clone, which this provider cannot offer on the pinned
+/// Broiler.VM packages.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>The members exist because the contract makes them mandatory, and they refuse because the
-/// capability behind them is not declared.</b> <c>IJsClone</c> is a base interface of
+/// capabilities behind them are not declared.</b> <c>IJsClone</c> is a base interface of
 /// <see cref="IJsRealm"/> rather than an optional one, so a provider must implement it whether or
-/// not its engine can clone; what a provider gets to decide is whether it declares
-/// <see cref="JsCapabilities.WorkerRealms"/>, and this one does not.
+/// not its engine can clone. <see cref="Clone"/> refuses <see cref="JsCapabilities.StructuredClone"/>
+/// and <see cref="Detach"/> and <see cref="Adopt"/> refuse <see cref="JsCapabilities.WorkerRealms"/>,
+/// the split I18 adopted from the J18 decision.
 /// </para>
 /// <para>
-/// <b>What is missing is not a clone algorithm but a second realm to clone into.</b> The
-/// Broiler.VM profile creates one realm per instance and has no agent model, so the two-realm half
-/// of the capability - detach on the sending thread, adopt on the receiving one - has no receiving
-/// side to be about. Writing the same-realm clone alone would let a host declare the capability and
-/// discover the other half missing at the moment a Worker started, which is later and worse.
+/// <b>What is missing is a public door to the profile's carrier.</b> The VM's own structured clone
+/// (JSD-0032) is reachable from the host only through <c>JsHostRealm.DetachClone</c> and
+/// <c>AdoptClone</c> (VM JSD-0024 section 17), which the pinned <c>0.1.0-preview.3</c> packages do
+/// not have; the adoption waits for the next VM release and pin update.
 /// </para>
 /// </remarks>
 internal sealed partial class VmRealm
@@ -25,7 +26,7 @@ internal sealed partial class VmRealm
     public JsValue Clone(JsValue value, ReadOnlySpan<JsValue> transfer = default)
     {
         ThrowIfDisposed();
-        throw Lacking(JsCapabilities.WorkerRealms);
+        throw Lacking(JsCapabilities.StructuredClone);
     }
 
     /// <inheritdoc />

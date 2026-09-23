@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>JSEAL — the JavaScript Engine Abstraction Layer. Engine-neutral contracts between HTML/DOM hosts and JavaScript engines, so which JavaScript engine runs a page is a provider choice rather than a compile-time fact.</Description>
+    <!-- The contracts build clean of nullable diagnostics (J15); keep them that way. -->
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

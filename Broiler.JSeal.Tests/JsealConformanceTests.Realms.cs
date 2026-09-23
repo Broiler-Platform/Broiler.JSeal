@@ -13,7 +13,7 @@ public partial class JsealConformanceTests
     // â”€â”€ re-entrancy and worker realms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ReentrantHostCalls | JsCapabilities.HostScriptSource)]
     public void AHostFunctionMayCallBackIntoScriptWhileTheEngineIsInsideIt(string engine)
     {
         using var realm = NewRealm(engine);
@@ -32,26 +32,20 @@ public partial class JsealConformanceTests
             return JsValue.Number(first.AsNumber + second.AsNumber);
         }
 
-        if (Lacks(realm, JsCapabilities.ReentrantHostCalls))
-        {
-            realm.DefineValue(realm.Global, "twice", realm.NewMethod("twice", Twice));
-            Assert.Throws<JsEngineException>(() => realm.EvaluateHostScript("twice(function (n) { return n; })", "test:reentrant"));
-            return;
-        }
+        AssertHas(realm, JsCapabilities.ReentrantHostCalls | JsCapabilities.HostScriptSource);
 
         realm.DefineValue(realm.Global, "twice", realm.NewMethod("twice", Twice, 1));
         Assert.Equal("42", Eval(realm, "String(twice(function (n) { return n; }))", "test:reentrant"));
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.WorkerRealms | JsCapabilities.HostScriptSource)]
     public void ASecondRealmRunsOnASecondThread(string engine)
     {
         var provider = Provider(engine);
         using var first = provider.CreateRealm(JsRealmOptions.Default);
 
-        if (Lacks(first, JsCapabilities.WorkerRealms))
-            return;
+        AssertHas(first, JsCapabilities.WorkerRealms | JsCapabilities.HostScriptSource);
 
         // Nothing promises that two threads may touch ONE realm â€” the contract says so and this
         // provider does not permit it â€” so the second realm is built and used entirely on the
@@ -114,13 +108,12 @@ public partial class JsealConformanceTests
     // â”€â”€ structured clone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.StructuredClone)]
     public void ACloneIsACopyRatherThanTheSameObject(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.WorkerRealms))
-            return;
+        AssertHas(realm, JsCapabilities.StructuredClone);
 
         var original = realm.NewObject();
         realm.DefineValue(original, "n", JsValue.Number(1d));
@@ -141,91 +134,40 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.StructuredClone)]
     public void CloningRefusesAValueTheAlgorithmDoesNotCover(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.WorkerRealms))
-            return;
+        AssertHas(realm, JsCapabilities.StructuredClone);
 
         // A function is the canonical uncloneable value, and a page reaches this by writing
         // postMessage(function () {}). The failure has to be an exception the host can catch and
         // turn into a DataCloneError, not a silently empty object.
         var uncloneable = realm.NewMethod("f", static (in _) => JsValue.Undefined);
         Assert.Throws<JsEngineException>(() => realm.Clone(uncloneable));
-        Assert.Throws<JsEngineException>(() => realm.Detach(uncloneable));
     }
 
-    /// <summary>
-    /// The other side of every <c>Lacks(realm, WorkerRealms)</c> early return above: what a realm
-    /// that does NOT declare the capability does when asked anyway, and what a caller may conclude
-    /// from the shape of the refusal.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b>Every other clone test skips this case, which is how five call sites came to get it
-    /// wrong.</b> A refusal is <c>JsCapabilityUnavailableException</c>, and that type deliberately
-    /// does not derive from <see cref="JsEngineException"/> â€” <c>JsErrors.cs</c> gives the reason:
-    /// the second means the page's code went wrong, the first means the host's did, and "a host that
-    /// branches on IJsRealm.Capabilities never sees it". The DOM bindings had it the other way
-    /// round: they called <c>Clone</c>, <c>Detach</c> and <c>Adopt</c> unguarded inside
-    /// <c>catch (JsEngineException)</c> written to raise a <c>DataCloneError</c>, and on a provider
-    /// without the capability that catch could never fire, so the host error went out through page
-    /// script raw. They branch now.
-    /// </para>
-    /// <para>
-    /// <b>The last assertion is the one that guards the fix rather than the bug.</b> Deriving
-    /// <c>JsCapabilityUnavailableException</c> from <see cref="JsEngineException"/> would make every
-    /// unfiltered catch in the bridge absorb a host bug as though it were a page error, so this
-    /// pins that they stay unrelated â€” and if a later change decides otherwise, it fails here and
-    /// the bindings get looked at again instead of quietly changing meaning.
-    /// </para>
-    /// <para>
-    /// It asserts nothing for a provider that HAS the capability, and says so by returning: the
-    /// clone behaviour of such a realm is what the two tests above are for.
-    /// </para>
-    /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
-    public void ARealmWithoutWorkerRealmsRefusesWithAHostErrorNoEngineCatchCanAbsorb(string engine)
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.WorkerRealms)]
+    public void DetachingRefusesAValueTheAlgorithmDoesNotCover(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (!Lacks(realm, JsCapabilities.WorkerRealms))
-            return;
+        AssertHas(realm, JsCapabilities.WorkerRealms);
 
-        var value = realm.NewObject();
-
-        var refusal = Assert.Throws<JsCapabilityUnavailableException>(() => realm.Clone(value));
-        Assert.Equal(JsCapabilities.WorkerRealms, refusal.Missing);
-        Assert.Equal(engine, refusal.EngineName);
-        Assert.Throws<JsCapabilityUnavailableException>(() => realm.Detach(value));
-
-        // Asked through reflection rather than as `refusal is JsEngineException`, which the compiler
-        // would fold to a constant for two sealed unrelated types and which would then stop being a
-        // question the moment someone changed the hierarchy â€” the exact change this is here to
-        // notice.
-        Assert.False(
-            typeof(JsEngineException).IsAssignableFrom(refusal.GetType()),
-            "A capability refusal must not be catchable as JsEngineException: the bindings branch on "
-            + "IJsRealm.Capabilities precisely because it is not, and a catch that absorbed it would "
-            + "report a host bug to the page as though the page had caused it.");
-
-        // ClassifyTransferable answers rather than refusing, because a host walking a transfer list
-        // asks it about every entry before deciding to clone anything. A refusal there would refuse
-        // the question rather than the operation.
-        Assert.Equal(JsTransferKind.NotTransferable, realm.ClassifyTransferable(value));
+        // The sending half of a worker message refuses it the same way Clone does.
+        var uncloneable = realm.NewMethod("f", static (in _) => JsValue.Undefined);
+        Assert.Throws<JsEngineException>(() => realm.Detach(uncloneable));
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.StructuredClone | JsCapabilities.HostScriptSource)]
     public void ATransferListDetachesItsSourceAndCarriesTheContents(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.WorkerRealms) || Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.StructuredClone | JsCapabilities.HostScriptSource);
 
         var buffer = realm.EvaluateHostScript(
             "(function () { var b = new ArrayBuffer(4); new Uint8Array(b)[0] = 7; return b; })()",
@@ -245,13 +187,12 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.StructuredClone)]
     public void OnlyATransferableObjectClassifiesAsOne(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.WorkerRealms))
-            return;
+        AssertHas(realm, JsCapabilities.StructuredClone);
 
         // The question a postMessage transfer list asks of every entry it does not recognise itself.
         // Everything that is not transferable answers the same way, including the hole a sparse
@@ -263,14 +204,13 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.WorkerRealms)]
     public void ADetachedCarrierBelongsToItsEngineAndToNoRealm(string engine)
     {
         var provider = Provider(engine);
         using var realm = provider.CreateRealm(JsRealmOptions.Default);
 
-        if (Lacks(realm, JsCapabilities.WorkerRealms))
-            return;
+        AssertHas(realm, JsCapabilities.WorkerRealms);
 
         var source = realm.NewObject();
         realm.DefineValue(source, "n", JsValue.Number(3d));
@@ -296,13 +236,12 @@ public partial class JsealConformanceTests
     // â”€â”€ the two array questions the messaging transfer-list walk is built on â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
     public void OwnPropertyNamesOfAnArrayAreItsPresentIndicesAndNotItsLength(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.HostScriptSource);
 
         // This is how the bridge walks a postMessage transfer list, and both halves matter. A HOLE
         // must be skipped: handing it on as a value would turn postMessage(m, [ , buf]) into a
@@ -316,13 +255,12 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
     public void DefiningTheNextIndexOnAnArrayExtendsIt(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.HostScriptSource);
 
         // Appending, as the worker global's listener array does it. An engine on which DefineIndex
         // left `length` behind would grow an array that JavaScript could not iterate, and the
@@ -397,13 +335,12 @@ public partial class JsealConformanceTests
     /// <c>ArrayBuffer</c> rather than declaring a type of its own.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
     public void AMintedArrayBufferIsTheRealmsOwnAndAViewOverItSeesTheBytes(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.BinaryData))
-            return;
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
 
         var bytes = new byte[] { 1, 2, 250 };
         var buffer = realm.NewArrayBuffer(bytes);
@@ -417,9 +354,6 @@ public partial class JsealConformanceTests
         bytes[0] = 9;
         Assert.True(realm.TryGetArrayBufferBytes(buffer, out var again));
         Assert.Equal([1, 2, 250], again);
-
-        if (Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
 
         realm.DefineValue(realm.Global, "minted", buffer);
 
@@ -442,13 +376,12 @@ public partial class JsealConformanceTests
     /// no contract of its own - this is the assertion that the chain ends somewhere testable.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
     public void TheHostReadsBackABufferAScriptMadeAndTellsOneFromEverythingElse(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.BinaryData) || Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
 
         var buffer = realm.EvaluateHostScript(
             "(function () { var b = new ArrayBuffer(3); var v = new Uint8Array(b); v[0] = 7; v[2] = 8; return b; })()",
@@ -459,7 +392,8 @@ public partial class JsealConformanceTests
 
         // A view is not a buffer, and the buffer it names is.
         var view = realm.EvaluateHostScript("new Uint8Array([4, 5, 6, 7])", "test:script-view");
-        Assert.False(realm.TryGetArrayBufferBytes(view, out _));
+        Assert.False(realm.TryGetArrayBufferBytes(view, out var notBuffer));
+        Assert.Null(notBuffer); // The contract's [NotNullWhen(true)]: a false answer carries no snapshot.
         Assert.True(realm.TryGetArrayBufferBytes(realm.GetProperty(view, "buffer"), out var viewed));
         Assert.Equal([4, 5, 6, 7], viewed);
 
@@ -495,13 +429,12 @@ public partial class JsealConformanceTests
     /// suite should run in a millisecond.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
     public void ABufferOfSixtyFourKilobytesMakesTheRoundTrip(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.BinaryData))
-            return;
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
 
         var bytes = new byte[64 * 1024];
         for (var i = 0; i < bytes.Length; i++)
@@ -511,9 +444,6 @@ public partial class JsealConformanceTests
 
         Assert.True(realm.TryGetArrayBufferBytes(buffer, out var read));
         Assert.Equal(bytes, read);
-
-        if (Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
 
         // Asserted from the guest as well, so a provider that kept the bytes somewhere the page
         // cannot see them fails here rather than passing on the host's own read.
@@ -547,13 +477,12 @@ public partial class JsealConformanceTests
     /// </para>
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
     public void APageThatRewritesTypedArrayLengthCannotChangeWhatTheHostReads(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.BinaryData) || Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
 
         var buffer = realm.EvaluateHostScript(
             "(function () { var b = new ArrayBuffer(5); var v = new Uint8Array(b);" +
@@ -582,5 +511,229 @@ public partial class JsealConformanceTests
         Assert.True(realm.TryGetArrayBufferBytes(minted, out var read));
         Assert.Equal([9, 8, 7], read);
     }
-}
 
+    /// <summary>
+    /// A page that redefines the typed-array species cannot change what the host reads out of a
+    /// buffer, nor make the read run the page's code.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>%TypedArray%.prototype.subarray</c> consults the view's <c>constructor</c> and then
+    /// <c>Symbol.species</c></b>, which the language requires and which a page may legally
+    /// redefine on <c>Uint8Array</c> or on <c>Uint8Array.prototype</c>. A provider that cut its
+    /// chunks with <c>subarray</c> - even the pinned intrinsic - would therefore let the page choose
+    /// the view the host renders: run guest code inside a host read, throw from it, or answer a
+    /// view of other bytes, or of more bytes than the chunk, which overran the host's array.
+    /// </para>
+    /// <para>
+    /// The chunk view is constructed directly with the pinned <c>Uint8Array</c> over the buffer,
+    /// offset and length, and that construction consults no species.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
+    public void APageThatRedefinesTypedArraySpeciesCannotChangeWhatTheHostReads(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
+
+        var buffer = realm.EvaluateHostScript(
+            "(function () { var b = new ArrayBuffer(3); var v = new Uint8Array(b);" +
+            " v[0] = 104; v[1] = 105; v[2] = 33; return b; })()",
+            "test:species-buffer");
+
+        // A longer answer than the chunk: the direction that overruns the host's array.
+        realm.EvaluateHostScript(
+            "globalThis.speciesCalls = 0;" +
+            "Object.defineProperty(Uint8Array, Symbol.species, { configurable: true, get: function () {" +
+            " globalThis.speciesCalls++; return function () { return new Uint8Array([6, 6, 6, 6, 6]); }; } });",
+            "test:species-longer");
+
+        Assert.True(realm.TryGetArrayBufferBytes(buffer, out var bytes));
+        Assert.Equal([104, 105, 33], bytes);
+
+        // A throwing species, reached through the prototype's constructor rather than the static.
+        realm.EvaluateHostScript(
+            "Object.defineProperty(Uint8Array.prototype, 'constructor', { configurable: true, get: function () {" +
+            " globalThis.speciesCalls++; throw new Error('page'); } });",
+            "test:species-throwing");
+
+        Assert.True(realm.TryGetArrayBufferBytes(buffer, out var again));
+        Assert.Equal([104, 105, 33], again);
+
+        Assert.Equal(0, realm.GetProperty(realm.Global, "speciesCalls").AsNumber);
+    }
+
+    /// <summary>
+    /// A page that replaces every binary intrinsic cannot change what the host mints or reads, nor
+    /// make either operation run the page's code.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Written against the realm's own globals, prototypes and accessors, all of which the
+    /// language lets a page redefine.</b> A provider that built or read a buffer through anything the
+    /// page can reach when the host asks - <c>ArrayBuffer</c>, <c>Uint8Array</c>, a typed array's
+    /// <c>set</c>, <c>join</c> or <c>subarray</c>, the buffer's <c>byteLength</c> getter, or
+    /// <c>Object.getOwnPropertyDescriptor</c> - would either run page code inside a host crossing or
+    /// answer with the page's bytes. Every replacement counts its calls, and the count must stay zero.
+    /// </para>
+    /// <para>
+    /// The minted buffer is asserted to be on the realm's original <c>ArrayBuffer.prototype</c>,
+    /// which the page kept a reference to before replacing the global: a buffer built through the
+    /// replaced constructor would carry the page's prototype instead.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
+    public void APageThatReplacesTheBinaryIntrinsicsCannotChangeWhatTheHostMintsOrReads(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
+
+        var buffer = realm.EvaluateHostScript(
+            "(function () { var b = new ArrayBuffer(4); var v = new Uint8Array(b);" +
+            " v[0] = 1; v[1] = 2; v[2] = 3; v[3] = 250; return b; })()",
+            "test:patched-buffer");
+
+        realm.EvaluateHostScript(
+            "globalThis.pageCalls = 0;" +
+            "var OriginalBufferPrototype = ArrayBuffer.prototype;" +
+            "function counted(answer) { return function () { globalThis.pageCalls++; return answer; }; }" +
+            "var typed = Object.getPrototypeOf(Uint8Array.prototype);" +
+            "['set', 'join', 'subarray', 'slice', 'fill'].forEach(function (name) {" +
+            "  typed[name] = counted(undefined); Uint8Array.prototype[name] = counted(undefined); });" +
+            "Object.defineProperty(ArrayBuffer.prototype, 'byteLength', { configurable: true, get: counted(99) });" +
+            "ArrayBuffer.prototype.slice = counted(undefined);" +
+            "Object.getOwnPropertyDescriptor = counted(undefined);" +
+            "globalThis.ArrayBuffer = function () { globalThis.pageCalls++; this.page = true; };" +
+            "globalThis.Uint8Array = function () { globalThis.pageCalls++; this.page = true; };",
+            "test:patch-binary");
+
+        Assert.True(realm.TryGetArrayBufferBytes(buffer, out var read));
+        Assert.Equal([1, 2, 3, 250], read);
+
+        var minted = realm.NewArrayBuffer([9, 8, 7]);
+        Assert.True(realm.TryGetArrayBufferBytes(minted, out var mintedBytes));
+        Assert.Equal([9, 8, 7], mintedBytes);
+
+        realm.DefineValue(realm.Global, "minted", minted);
+        Assert.Equal(0, realm.GetProperty(realm.Global, "pageCalls").AsNumber);
+
+        // RECORDED GAP, Broiler.JS provider: the pinned engine's buffer constructor takes its
+        // prototype from the global named ArrayBuffer at the moment of the mint, so a page that
+        // replaced the global gives the host's buffer the page's prototype. Pinned here so that a
+        // fix is noticed; the bytes and the page-call count above are right on both providers.
+        Assert.Equal(
+            engine == "broiler-js" ? "false" : "true",
+            Eval(realm, "String(Object.getPrototypeOf(minted) === OriginalBufferPrototype)", "test:patched-prototype"));
+    }
+
+    /// <summary>
+    /// The brand is the engine's buffer type: a subclass instance and a buffer whose prototype was
+    /// changed are buffers, and a proxy around one is not.
+    /// </summary>
+    /// <remarks>
+    /// <b>Each case would be answered the other way by a check a page can influence.</b> A prototype
+    /// test rejects the re-parented buffer and accepts nothing it should not; a proxy forwards
+    /// <c>byteLength</c> reads and prototype queries to its target, so any check made through
+    /// ordinary property access would call it a buffer. The language's own brand check
+    /// (<c>ArrayBuffer.prototype.byteLength</c> on a proxy throws) says it is not.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
+    public void TheBufferBrandIsTheEnginesTypeAndNotAnythingAPageCanDress(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
+
+        var subclassed = realm.EvaluateHostScript(
+            "(function () { class Sub extends ArrayBuffer {} var b = new Sub(2); new Uint8Array(b)[1] = 5; return b; })()",
+            "test:brand-subclass");
+        Assert.True(realm.TryGetArrayBufferBytes(subclassed, out var subclassBytes));
+        Assert.Equal([0, 5], subclassBytes);
+
+        var reparented = realm.EvaluateHostScript(
+            "(function () { var b = new ArrayBuffer(1); new Uint8Array(b)[0] = 6; Object.setPrototypeOf(b, null); return b; })()",
+            "test:brand-reparented");
+        Assert.True(realm.TryGetArrayBufferBytes(reparented, out var reparentedBytes));
+        Assert.Equal([6], reparentedBytes);
+
+        var proxied = realm.EvaluateHostScript("new Proxy(new ArrayBuffer(3), {})", "test:brand-proxy");
+        Assert.False(realm.TryGetArrayBufferBytes(proxied, out var proxiedBytes));
+        Assert.Null(proxiedBytes);
+
+        Assert.False(realm.TryGetArrayBufferBytes(JsValue.Number(4d), out _));
+        Assert.False(realm.TryGetArrayBufferBytes(JsValue.Undefined, out _));
+        Assert.False(realm.TryGetArrayBufferBytes(JsValue.Boolean(true), out _));
+    }
+
+    /// <summary>
+    /// A detached buffer answers <see langword="true"/> with no bytes, the buffer it moved to answers
+    /// its bytes, and an empty buffer answers <see langword="true"/> with no bytes too.
+    /// </summary>
+    /// <remarks>
+    /// <b>The contract's detached rule, asserted directly.</b> <c>transfer</c> is the language's own
+    /// door to detachment, so this needs no host detach operation. A provider that answered a
+    /// detached buffer as "not a buffer" would turn a zero-length blob into the string
+    /// <c>"[object ArrayBuffer]"</c>; one that answered its old bytes would read freed storage.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
+    public void ADetachedBufferAnswersTrueWithNoBytesAndTheBufferItMovedToAnswersThem(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
+
+        realm.EvaluateHostScript(
+            "var original = new ArrayBuffer(3); new Uint8Array(original).set([4, 5, 6]);" +
+            "var moved = original.transfer();",
+            "test:detach");
+
+        Assert.Equal("0", Eval(realm, "String(original.byteLength)", "test:detached-length"));
+
+        var original = realm.GetProperty(realm.Global, "original");
+        Assert.True(realm.TryGetArrayBufferBytes(original, out var detachedBytes));
+        Assert.Empty(detachedBytes);
+
+        Assert.True(realm.TryGetArrayBufferBytes(realm.GetProperty(realm.Global, "moved"), out var movedBytes));
+        Assert.Equal([4, 5, 6], movedBytes);
+
+        var empty = realm.NewArrayBuffer([]);
+        Assert.True(realm.TryGetArrayBufferBytes(empty, out var emptyBytes));
+        Assert.Empty(emptyBytes);
+        realm.DefineValue(realm.Global, "empty", empty);
+        Assert.Equal("0/0", Eval(realm, "empty.byteLength + '/' + new Uint8Array(empty).length", "test:empty-buffer"));
+    }
+
+    /// <summary>
+    /// A read hands the host a snapshot it owns, and a mint copies the host's bytes: neither side's
+    /// later writes reach the other.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.BinaryData | JsCapabilities.HostScriptSource)]
+    public void AReadIsASnapshotAndAMintIsACopyInBothDirections(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.BinaryData | JsCapabilities.HostScriptSource);
+
+        var source = new byte[20_000];
+        for (var i = 0; i < source.Length; i++)
+            source[i] = (byte)(i % 251);
+
+        var minted = realm.NewArrayBuffer(source);
+        Array.Fill(source, (byte)0xEE);
+        realm.DefineValue(realm.Global, "minted", minted);
+
+        Assert.True(realm.TryGetArrayBufferBytes(minted, out var first));
+        Assert.Equal(20_000, first.Length);
+        Assert.Equal((byte)(19_999 % 251), first[19_999]);
+
+        // The guest writes after the host read; the host's snapshot must not move with it.
+        realm.EvaluateHostScript("new Uint8Array(minted).fill(7);", "test:guest-writes");
+        Assert.Equal((byte)(19_999 % 251), first[19_999]);
+
+        // And the host writes into its snapshot; the guest's buffer must not move with it.
+        first[0] = 99;
+        Assert.Equal("7/7", Eval(realm, "(function () { var v = new Uint8Array(minted); return v[0] + '/' + v[19999]; })()", "test:host-writes"));
+    }
+}

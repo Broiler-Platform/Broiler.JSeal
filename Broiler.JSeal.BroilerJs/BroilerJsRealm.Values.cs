@@ -12,7 +12,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// <see cref="IJsValues"/>: minting the realm's own values, the two coercions that can run page
 /// script, and the truthiness test a handle cannot perform for a BigInt.
 /// </summary>
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     /// <inheritdoc />
     public JsValue NewObject()
@@ -58,6 +58,11 @@ internal sealed partial class BroilerJsRealm
     /// the field still holds the array after detachment, so the flag has to be read rather than the
     /// length.
     /// </para>
+    /// <para>
+    /// <b>The bytes are copied, because the engine's field IS the buffer's storage.</b> Handing it
+    /// out would let a later guest write change the snapshot the host was promised, and a host
+    /// write change the guest's buffer.
+    /// </para>
     /// </remarks>
     public bool TryGetArrayBufferBytes(JsValue value, [NotNullWhen(true)] out byte[]? bytes)
     {
@@ -69,7 +74,7 @@ internal sealed partial class BroilerJsRealm
             return false;
         }
 
-        bytes = buffer.Detached ? [] : buffer.Buffer;
+        bytes = buffer.Detached ? [] : buffer.Buffer.AsSpan().ToArray();
         return true;
     }
 
@@ -160,6 +165,40 @@ internal sealed partial class BroilerJsRealm
 
         using var scope = Enter();
         return BroilerJsMarshal.Unwrap(value).BooleanValue;
+    }
+
+    /// <summary>
+    /// ECMAScript <c>IsStrictlyEqual</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Only a pair of BigInt handles reaches the engine,</b> whose <c>StrictEquals</c> compares two
+    /// BigInts by value and runs no page script. Every other pair is the handle's operator, which is
+    /// <c>===</c> for those kinds: this provider hands out the engine's own object, symbol and BigInt
+    /// references, so identity is the engine's identity. <see cref="JsValue.Missing"/> is
+    /// <c>undefined</c>, as <see cref="BroilerJsMarshal.Unwrap"/> hands it to the engine.
+    /// </para>
+    /// <para>
+    /// A BigInt handle whose reference is not this engine's value is refused with
+    /// <see cref="JsEngineException"/> by <see cref="BroilerJsMarshal.Unwrap"/>, on either path, so a
+    /// mixed pair cannot answer <see langword="false"/> for a handle it never looked at. The
+    /// BigInt-kind arm also covers this engine's decimal (see <see cref="ToBoolean"/>); the engine
+    /// answers a decimal and a BigInt as unequal.
+    /// </para>
+    /// </remarks>
+    public bool IsStrictlyEqual(JsValue left, JsValue right)
+    {
+        if (left.Kind is not JsValueKind.BigInt && right.Kind is not JsValueKind.BigInt)
+        {
+            ThrowIfDisposed();
+            return (left.IsMissing ? JsValue.Undefined : left) == (right.IsMissing ? JsValue.Undefined : right);
+        }
+
+        using var scope = Enter();
+        var engineLeft = BroilerJsMarshal.Unwrap(left);
+        var engineRight = BroilerJsMarshal.Unwrap(right);
+
+        return left.Kind == right.Kind && engineLeft.StrictEquals(engineRight);
     }
 }
 

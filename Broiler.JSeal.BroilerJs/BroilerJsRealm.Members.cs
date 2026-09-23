@@ -13,7 +13,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// <summary>
 /// <see cref="IJsMembers"/> operations, including guest accessors and Proxy traps.
 /// </summary>
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     /// <inheritdoc />
     public void DefineValue(JsValue target, string name, JsValue value, JsPropertyFlags flags = JsPropertyFlags.Default) =>

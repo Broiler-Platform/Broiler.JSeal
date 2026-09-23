@@ -1,4 +1,6 @@
-﻿namespace Broiler.JSeal;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Broiler.JSeal;
 
 /// <summary>An optional provider interface for wrapping an existing engine realm.</summary>
 /// <remarks>
@@ -16,6 +18,6 @@ public interface IJsRealmAdoption
     /// removes only its own policy subscriptions. The original host retains its context and job queue.
     /// Adopting the same context twice may return distinct wrappers; callers retain the wrapper they need.
     /// </remarks>
-    bool TryAdopt(object engineRealm, JsRealmOptions options, out IJsRealm? realm);
+    bool TryAdopt(object engineRealm, JsRealmOptions options, [NotNullWhen(true)] out IJsRealm? realm);
 }
 

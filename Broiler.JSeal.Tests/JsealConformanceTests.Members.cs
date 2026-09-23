@@ -490,19 +490,12 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises | JsCapabilities.HostScriptSource)]
     public void APromiseSettlesFromTheHostAndItsReactionRunsAtTheNextDrain(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.Promises))
-        {
-            // An engine that cannot hand a pending promise to the host has no deferred result for
-            // fetch or whenDefined to return, and must say so rather than hand back something that
-            // never settles.
-            Assert.Throws<JsCapabilityUnavailableException>(() => realm.NewPromise(out _, out _));
-            return;
-        }
+        AssertHas(realm, JsCapabilities.Promises | JsCapabilities.HostScriptSource);
 
         var promise = realm.NewPromise(out var resolve, out _);
         realm.DefineValue(realm.Global, "pending", promise);
@@ -520,16 +513,12 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises)]
     public void ARejectedPromiseReachesItsRejectionHandler(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.Promises))
-        {
-            Assert.Throws<JsCapabilityUnavailableException>(() => realm.NewPromise(out _, out _));
-            return;
-        }
+        AssertHas(realm, JsCapabilities.Promises);
 
         var promise = realm.NewPromise(out _, out var reject);
         realm.DefineValue(realm.Global, "failing", promise);
@@ -558,13 +547,12 @@ public partial class JsealConformanceTests
     /// </para>
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises)]
     public void APageThatReplacesPromiseDoesNotCaptureTheHostsPromises(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.Promises))
-            return;
+        AssertHas(realm, JsCapabilities.Promises);
 
         // The page replaces the global, exactly as it is entitled to.
         realm.EvaluateHostScript(
@@ -603,13 +591,12 @@ public partial class JsealConformanceTests
     /// </para>
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises)]
     public void APromiseIsStillAvailableInARealmThatForbidsGuestEvaluation(string engine)
     {
         using var realm = NewRealm(engine, new JsRealmOptions { AllowGuestEval = false });
 
-        if (Lacks(realm, JsCapabilities.Promises))
-            return;
+        AssertHas(realm, JsCapabilities.Promises);
 
         Assert.False(realm.Capabilities.HasFlag(JsCapabilities.GuestEval));
         Assert.Throws<JsCapabilityUnavailableException>(
@@ -626,5 +613,120 @@ public partial class JsealConformanceTests
 
         Assert.Equal("got:value", Eval(realm, "got", "test:restricted-after"));
     }
-}
 
+    /// <summary>
+    /// The first settlement wins, whichever half makes it, and a later call on either half changes
+    /// nothing and queues nothing.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises | JsCapabilities.HostScriptSource)]
+    public void APromiseSettlesOnceWhicheverHalfIsCalledFirst(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.Promises | JsCapabilities.HostScriptSource);
+
+        var resolvedFirst = realm.NewPromise(out var resolve, out var reject);
+        var rejectedFirst = realm.NewPromise(out var resolveLate, out var rejectFirst);
+        realm.DefineValue(realm.Global, "resolvedFirst", resolvedFirst);
+        realm.DefineValue(realm.Global, "rejectedFirst", rejectedFirst);
+        realm.EvaluateHostScript(
+            "var outcomes = [];" +
+            "resolvedFirst.then(function (v) { outcomes.push('fulfilled:' + v); }, function (e) { outcomes.push('rejected:' + e); });" +
+            "rejectedFirst.then(function (v) { outcomes.push('fulfilled:' + v); }, function (e) { outcomes.push('rejected:' + e); });",
+            "test:settle-once");
+
+        resolve(JsValue.String("a"));
+        resolve(JsValue.String("b"));
+        reject(JsValue.String("c"));
+        rejectFirst(JsValue.String("x"));
+        resolveLate(JsValue.String("y"));
+        rejectFirst(JsValue.String("z"));
+
+        realm.DrainJobs();
+        Assert.Equal("fulfilled:a,rejected:x", Eval(realm, "outcomes.join(',')", "test:settle-once-after"));
+
+        // Settled promises stay settled: a later call queues no reaction.
+        resolve(JsValue.String("late"));
+        rejectFirst(JsValue.String("late"));
+        Assert.False(realm.HasPendingJobs);
+        Assert.Equal(0, realm.DrainJobs());
+    }
+
+    /// <summary>
+    /// Resolution follows the language's promise resolve procedure: a thenable's <c>then</c> is read
+    /// at once and called from a job, another promise is adopted, the promise itself is refused with
+    /// a <c>TypeError</c>, and rejection never adopts.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises | JsCapabilities.HostScriptSource)]
+    public void APromiseResolvedWithAThenableAdoptsItThroughTheJobQueue(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.Promises | JsCapabilities.HostScriptSource);
+
+        var adopting = realm.NewPromise(out var resolveAdopting, out _);
+        var chained = realm.NewPromise(out var resolveChained, out _);
+        var inner = realm.NewPromise(out var resolveInner, out _);
+        var self = realm.NewPromise(out var resolveSelf, out _);
+        var rejected = realm.NewPromise(out _, out var reject);
+        realm.DefineValue(realm.Global, "adopting", adopting);
+        realm.DefineValue(realm.Global, "chained", chained);
+        realm.DefineValue(realm.Global, "self", self);
+        realm.DefineValue(realm.Global, "rejected", rejected);
+
+        var thenable = realm.EvaluateHostScript(
+            "var log = []; var seen = {};" +
+            "adopting.then(function (v) { seen.adopting = v; });" +
+            "chained.then(function (v) { seen.chained = v; });" +
+            "self.then(null, function (e) { seen.self = e instanceof TypeError; });" +
+            "rejected.then(null, function (e) { seen.rejected = e === thenable; });" +
+            "var thenable = { get then() { log.push('get'); return function (ok) { log.push('call'); ok('inner'); }; } };" +
+            "thenable",
+            "test:thenable");
+
+        resolveAdopting(thenable);
+        Assert.Equal("get", Eval(realm, "log.join(',')", "test:thenable-read"));
+
+        resolveChained(inner);
+        resolveSelf(self);
+        reject(thenable);
+        Assert.Equal("get", Eval(realm, "log.join(',')", "test:reject-reads-nothing"));
+
+        realm.DrainJobs();
+        resolveInner(JsValue.String("from-inner"));
+        realm.DrainJobs();
+
+        Assert.Equal("get,call", Eval(realm, "log.join(',')", "test:thenable-called"));
+        Assert.Equal(
+            "inner/from-inner/true/true",
+            Eval(realm, "seen.adopting + '/' + seen.chained + '/' + seen.self + '/' + seen.rejected", "test:thenable-after"));
+    }
+
+    /// <summary>
+    /// Settling with a missing value settles with <c>undefined</c>, never with a hole a reaction
+    /// would read as an uninitialised binding.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.Promises | JsCapabilities.HostScriptSource)]
+    public void APromiseSettledWithAMissingValueSettlesWithUndefined(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.Promises | JsCapabilities.HostScriptSource);
+
+        var fulfilled = realm.NewPromise(out var resolve, out _);
+        var rejected = realm.NewPromise(out _, out var reject);
+        realm.DefineValue(realm.Global, "fulfilled", fulfilled);
+        realm.DefineValue(realm.Global, "rejected", rejected);
+        realm.EvaluateHostScript(
+            "var got = [];" +
+            "fulfilled.then(function (v) { got.push(typeof v); });" +
+            "rejected.then(null, function (e) { got.push(typeof e); });",
+            "test:missing");
+
+        resolve(JsValue.Missing);
+        reject(JsValue.Missing);
+        realm.DrainJobs();
+
+        Assert.Equal("undefined,undefined", Eval(realm, "got.join(',')", "test:missing-after"));
+    }
+}

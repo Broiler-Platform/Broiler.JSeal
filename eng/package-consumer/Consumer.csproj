@@ -10,13 +10,19 @@
     <DisableImplicitLibraryPacksFolder>true</DisableImplicitLibraryPacksFolder>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DefineConstants Condition="'$(Provider)' == 'Vm'">$(DefineConstants);CONSUMER_VM</DefineConstants>
+    <DefineConstants Condition="'$(Provider)' == 'Both'">$(DefineConstants);CONSUMER_BOTH</DefineConstants>
   </PropertyGroup>
   <!-- Only the selected provider is direct. Its package must supply the contracts transitively. -->
-  <ItemGroup>
+  <ItemGroup Condition="'$(Provider)' != 'Both'">
     <PackageReference Include="Broiler.JSeal.$(Provider)" Version="[$(ConsumerPackageVersion)]" />
   </ItemGroup>
+  <!-- J19: both providers, and therefore both engine families, in one consumer process. -->
+  <ItemGroup Condition="'$(Provider)' == 'Both'">
+    <PackageReference Include="Broiler.JSeal.BroilerJs" Version="[$(ConsumerPackageVersion)]" />
+    <PackageReference Include="Broiler.JSeal.Vm" Version="[$(ConsumerPackageVersion)]" />
+  </ItemGroup>
   <Target Name="ValidateConsumerInputs" BeforeTargets="CollectPackageReferences">
-    <Error Condition="'$(Provider)' != 'BroilerJs' And '$(Provider)' != 'Vm'" Text="Select BroilerJs or Vm." />
+    <Error Condition="'$(Provider)' != 'BroilerJs' And '$(Provider)' != 'Vm' And '$(Provider)' != 'Both'" Text="Select BroilerJs, Vm or Both." />
     <Error Condition="'$(ConsumerPackageVersion)' == ''" Text="ConsumerPackageVersion is required." />
   </Target>
 </Project>

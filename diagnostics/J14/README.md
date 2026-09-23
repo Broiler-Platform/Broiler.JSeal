@@ -1,12 +1,13 @@
 # J14 documentation validation
 
-Run from the repository root with Python 3.9+ and ripgrep on PATH:
+Run from the repository root with Python 3.9+ (and git, or ripgrep on PATH):
 
 ```powershell
 python diagnostics/J14/check_docs.py
 ```
 
-The checker discovers Markdown files with `rg --files`, checks repository-local inline and simple
+The checker discovers Markdown files with `rg --files`, or, when `rg` is not on PATH, with
+`git ls-files --cached --others --exclude-standard` minus hidden paths (the same set). It checks repository-local inline and simple
 reference links, validates Markdown heading fragments, and checks literal project/solution paths
 in dotnet command examples. It prints a JSON summary and exits nonzero on any invalid target.
 Git-ignored build/test output is excluded. External URLs are not fetched; fenced commands marked

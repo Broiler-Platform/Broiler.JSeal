@@ -61,7 +61,46 @@ public sealed class JsEngineException : Exception
     /// The JavaScript stack at the throw, when the engine supplied one. The CLR
     /// <see cref="Exception.StackTrace"/> is the host's stack and is a different question.
     /// </summary>
+    /// <remarks>
+    /// Engine-specific and not normalized. Broiler.JS supplies its own trace text; Broiler.VM supplies
+    /// none. Use <see cref="SourceLabel"/> and <see cref="SourceLine"/> for guaranteed attribution.
+    /// </remarks>
     public string? ScriptStackTrace { get; init; }
+
+    /// <summary>
+    /// The selected source identity of the evaluation a guest throw escaped from, or
+    /// <see langword="null"/> when the exception did not escape an <see cref="IJsSource"/> member.
+    /// </summary>
+    /// <remarks>
+    /// Both bundled providers set it for guest throws, including syntax errors, that leave
+    /// <see cref="IJsSource"/> members. It names the evaluation, not the script that defined the
+    /// throwing function. <see cref="JsRealmOptions.SourceLabelFor"/> defines the selection.
+    /// </remarks>
+    public string? SourceLabel { get; init; }
+
+    /// <summary>
+    /// The one-based line, in the text the host supplied, of a syntax error that stopped the
+    /// evaluation before it ran; <see langword="null"/> for run-time throws or an unknown position.
+    /// </summary>
+    /// <remarks>
+    /// Lines are counted as ECMAScript counts them, at every LineTerminator, and forced strict mode
+    /// never shifts them. A provider reports <see langword="null"/> rather than a line its engine may
+    /// have miscounted. Broiler.JS reports the parser's line only when its compile frame and message
+    /// agree and the text has no lone CR, U+2028 or U+2029, so it has none at end of input or for an
+    /// unterminated token. Broiler.VM reports its front end's line except for text holding both a
+    /// backquote and a backslash-continued line.
+    /// </remarks>
+    public int? SourceLine { get; init; }
+
+    /// <summary>
+    /// The one-based UTF-16 column accompanying <see cref="SourceLine"/>, when the provider can
+    /// report one relative to the supplied text; otherwise <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// Broiler.VM reports it. Broiler.JS does not, because its parser's columns use different bases
+    /// on the first and later lines and forced strict mode shifts first-line columns.
+    /// </remarks>
+    public int? SourceColumn { get; init; }
 }
 
 /// <summary>

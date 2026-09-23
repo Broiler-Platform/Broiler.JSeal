@@ -70,7 +70,9 @@ public sealed class JsDetachedValue
 
 /// <summary>
 /// Structured clone: copying a value, and moving one from a realm on this thread to a realm on
-/// another. Requires <see cref="JsCapabilities.WorkerRealms"/>.
+/// another. <see cref="Clone"/> and <see cref="ClassifyTransferable"/> require
+/// <see cref="JsCapabilities.StructuredClone"/>; <see cref="Detach"/> and <see cref="Adopt"/> require
+/// <see cref="JsCapabilities.WorkerRealms"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -112,7 +114,9 @@ public interface IJsClone
     /// transferable and is a thing the <em>bridge</em> owns, so the walk over the list has to be the
     /// host's and only the entries it does not recognise are the engine's to classify. Answering
     /// without entering the engine is permitted and expected; the question is decidable from the
-    /// object.
+    /// object. It answers rather than refusing: a realm without
+    /// <see cref="JsCapabilities.StructuredClone"/> has nothing it can transfer, and answers
+    /// <see cref="JsTransferKind.NotTransferable"/>.
     /// </remarks>
     JsTransferKind ClassifyTransferable(JsValue value);
 
@@ -128,6 +132,7 @@ public interface IJsClone
     /// are DOM errors with wording the host owns.
     /// </param>
     /// <exception cref="JsEngineException">The value is not cloneable, or an entry is not transferable.</exception>
+    /// <exception cref="JsCapabilityUnavailableException">The realm lacks <see cref="JsCapabilities.StructuredClone"/>.</exception>
     JsValue Clone(JsValue value, ReadOnlySpan<JsValue> transfer = default);
 
     /// <summary>
@@ -142,6 +147,7 @@ public interface IJsClone
     /// reads it, and it may cross threads.
     /// </remarks>
     /// <exception cref="JsEngineException">The value is not cloneable, or an entry is not transferable.</exception>
+    /// <exception cref="JsCapabilityUnavailableException">The realm lacks <see cref="JsCapabilities.WorkerRealms"/>.</exception>
     JsDetachedValue Detach(JsValue value, ReadOnlySpan<JsValue> transfer = default);
 
     /// <summary>
@@ -155,6 +161,7 @@ public interface IJsClone
     /// <exception cref="JsEngineException">
     /// The carrier was minted by a different engine, so this realm cannot walk its graph.
     /// </exception>
+    /// <exception cref="JsCapabilityUnavailableException">The realm lacks <see cref="JsCapabilities.WorkerRealms"/>.</exception>
     JsValue Adopt(JsDetachedValue detached);
 }
 

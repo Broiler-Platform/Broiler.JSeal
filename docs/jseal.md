@@ -39,10 +39,35 @@ stable VM object identity. ObjectIdentity can key host weak tables without boxin
 
 Missing is kind zero, distinct from explicit undefined. JsValue.ToString is a diagnostic rendering
 that never executes guest code; realm ToJsString and ToNumber perform guest coercions.
-AsBoolean is a cheap handle inspection; use realm ToBoolean when BigInt is possible. The VM provider
-currently has no BigInt support. Equality uses object identity and strict equality for non-BigInt
-primitives; NaN is unequal under `==` but Equals is reflexive for .NET collections. BigInt handles
-compare by reference, a known limitation rather than mathematical BigInt equality.
+AsBoolean is a cheap handle inspection; use realm ToBoolean when BigInt is possible. Equality uses
+object identity and strict equality for non-BigInt primitives; NaN is unequal under `==` but Equals
+is reflexive for .NET collections.
+
+**BigInt (B06).** A BigInt handle is opaque: JsValue cannot read its integer, so two rules follow,
+and both providers implement them the same way.
+
+- *Truthiness* is `IJsValues.ToBoolean`: `0n` (however computed) is false, every other BigInt is
+  true, and a BigInt object is an object and true. `AsBoolean` answers true for every BigInt handle
+  and stays that way.
+- *Equality* is `IJsValues.IsStrictlyEqual`, ECMAScript `===` without running page script: two
+  BigInts are equal when their integers are, and a BigInt never equals a Number or a String. For
+  every other kind it answers what `==` answers, except that `JsValue.Missing`, which is no
+  JavaScript value, is `undefined` there (as both providers make it in `Clone`):
+  `IsStrictlyEqual(Missing, Undefined)` is true although the handles differ. JsValue's `==`, `Equals` and `GetHashCode` compare
+  BigInt handles **by reference** and are not changed: a true answer means the same value, a false
+  one means nothing, because Broiler.JS hands back the engine's own value and Broiler.VM mints a new
+  box per crossing. A host keying a dictionary on a BigInt's value keys on `ToJsString`'s answer.
+
+`IsStrictlyEqual` is a new `IJsValues` member with a default body, so an out-of-tree provider still
+compiles; that body answers `==` wherever `==` is `===` and throws `NotSupportedException` for two
+distinct BigInt handles. A BigInt handle another engine minted is refused with `JsEngineException` by
+every member that would unwrap it (Broiler.JS used to raise an `InvalidCastException`). Values cross
+exactly both ways: as a property, as a callback argument or result, through `Invoke`, and through a
+same-realm `Clone`. Broiler.VM has BigInt from the release that carries its B05-B08 work (host value
+kind `JsHostValueKind.BigInt`); on the pinned `0.1.0-preview.3` it has none and refuses a BigInt
+literal. [JsealConformanceTests.BigInt.cs](../Broiler.JSeal.Tests/JsealConformanceTests.BigInt.cs)
+holds the shared cases, driven by a stated per-engine table of the BigInt value, `BigInt64Array`/
+`BigUint64Array` and the DataView BigInt accessors.
 
 [JsCall](../Broiler.JSeal/Values/JsCall.cs) carries the realm, receiver, arguments and NewTarget.
 Its argument span is borrowed for the callback duration; copy values that must survive the callback.
@@ -73,6 +98,15 @@ Unsupported capabilities use JsCapabilityUnavailableException.
 engine's `IsFunction` predicate before classifying general objects. It retains the proxy's own
 identity, without reading guest properties or unwrapping its target. Revocation leaves a callable
 proxy classified as a function; invoking it throws a guest `TypeError`.
+
+**Invoke and Construct refuse a handle that is not a function.** Both providers check the handle's
+classification before the engine sees the call and throw `JsEngineException` whose `Thrown` is the
+realm's `TypeError`, as ECMAScript's Call does. A noncallable Proxy's `apply` or `construct` trap
+never runs; Broiler.JS previously ran it, and the VM previously answered with a host-surface refusal.
+The check comes before the VM's foreign-realm check, so a non-function handle from another VM realm
+also gets the `TypeError`; a foreign function handle is still refused as foreign. This is the host
+API only: guest code calling a noncallable Proxy on the pinned Broiler.JS engine still runs its
+`apply` trap, an engine defect that JSeal does not cover.
 
 **`IsArray` means an actual Array exotic object.** It is not the ECMAScript `Array.isArray` operation,
 which follows proxy targets and can throw after revocation. Array proxies remain Object handles;
@@ -148,15 +182,69 @@ use their own source's strictness on both providers. The
 [source authorization tests](../Broiler.JSeal.Tests/JsealConformanceTests.SourceAuthorization.cs)
 pin these boundaries.
 
-Source identity remains incomplete: JS passes label to Eval; VM currently uses a fixed compiler unit
-name and the label only in a missing-eval diagnostic. Neither provider consumes DocumentUrl.
-J17 in the [JSeal roadmap](roadmap.jseal.md) tracks that decision. No source method executes module graphs.
+The restriction was audited route by route on the pinned packages, and the
+[guest-evaluation route tests](../Broiler.JSeal.Tests/JsealConformanceTests.GuestEvalRoutes.cs) keep
+every route refused: each function kind's constructor reached through a prototype, `call`, `apply`,
+`bind` or `Reflect`; ShadowRealm `evaluate` reached indirectly, subclassed or nested; promise jobs and
+async continuations; string timer callbacks; interop globals and `import('clr')`; and structured
+clone into a restricted worker realm. No route compiles. Broiler.JS raises its evaluation hook on the
+realm that constructed a ShadowRealm, so `evaluate` is refused there. Code already running inside a
+ShadowRealm asks the child context, which nothing subscribes to (VM decision JSD-0030 follow-up
+SR-6), and SR-6 remains open upstream. That code is unreachable only while `evaluate` is refused
+and `importValue` is unimplemented. A test pins the pinned package's synchronous "not implemented"
+`TypeError` from `importValue`, so any package that changes it fails and forces SR-6 to be
+reviewed; the test cannot tell a fixed `importValue` from an unfixed one, and has to be replaced by
+one that loads an `eval`-calling module once `importValue` loads modules. Broiler.VM has no
+ShadowRealm.
+
+The policy belongs to the realm whose `eval`, `Function` or ShadowRealm is called, as ECMAScript's
+HostEnsureCanCompileStrings specifies. A restricted realm's own functions compile nothing even when
+another realm's API invokes them. A host that hands a permissive realm's `eval`, `Function` or
+ShadowRealm into a restricted realm has granted it compilation on Broiler.JS, which does not check
+which realm minted a handle. Broiler.VM refuses such foreign handles at the crossing.
+
+### Source identity
+
+Each evaluation selects one diagnostic identity with `JsRealmOptions.SourceLabelFor`: a non-blank
+label, then a non-blank `DocumentUrl`, then `anonymous`. `DocumentUrl` has no other meaning: it is
+not used for module resolution, caching, origin checks or permission. Labels never select a member,
+strictness or permission. No source method executes module graphs; module graphs have their own
+optional contract (see [Modules](#modules)), whose source labels come from the host's loads.
+
+| Metadata on `JsEngineException` | Broiler.JS | Broiler.VM |
+| --- | --- | --- |
+| `SourceLabel` for guest throws and syntax errors leaving a source member | Yes | Yes |
+| `SourceLine` for a syntax error in the supplied text | Parser line when trusted; none at end of input, for an unterminated token, or for text with a lone CR, U+2028 or U+2029 | Front-end line; none for text with a backquote and a backslash-continued line |
+| `SourceColumn` | Not reported | Front-end UTF-16 column, with the line |
+| `ScriptStackTrace` and guest `error.stack` | Engine text with `label:line,column` frames | None |
+
+Only the label is always present. A reported syntax-error line is the ECMAScript line in the
+supplied text; where a pinned engine is known to miscount, the provider reports no line rather than
+a wrong one. Lines refer to the supplied text under `ForceStrictMode`. JS prepends the directive
+on line 1, so its engine-reported first-line columns shift by 13 characters. VM uses a compiler flag. The pinned VM eval request carries only
+source bytes and always runs entry `main`, so the label cannot reach VM compilation or guest
+frames. A VM source-name, diagnostic and stack API is an upstream follow-up. The
+[source identity tests](../Broiler.JSeal.Tests/JsealConformanceTests.SourceIdentity.cs) keep
+guaranteed metadata separate from provider-specific stack details.
 
 ## Capabilities and limits
 
-A realm may narrow its provider's capabilities. Document combines HostScriptSource,
-ClassicScriptSource, Promises, ExoticObjects, GlobalIsVariableScope, ReentrantHostCalls and BinaryData.
-It does not imply complete ECMAScript support or integration into an external browser.
+**Provider ability and realm permission are separate.** A provider's `Capabilities` states what its
+engine can do before any realm exists. A realm's `Capabilities` is that ability narrowed, and is
+never wider. Two things narrow it. The host's permissions: today the only one is
+`AllowGuestEval = false`, which removes GuestEval and nothing else. And the provider's own check of
+the realm it built: the [VM provider](../Broiler.JSeal.Vm/VmEngineProvider.cs) withholds BinaryData
+when its bridge captured no binary intrinsics, and HostScriptSource, ClassicScriptSource and GuestEval
+when it captured no `eval`, rather than declare what that realm cannot do. With the pinned VM packages
+neither check fires, and a default-options realm has exactly its provider's capabilities; the suite
+asserts this, so a realm that did hit one of those checks fails instead of quietly narrowing. Calling a contract member without
+its capability throws JsCapabilityUnavailableException naming the missing flag. That exception does
+not derive from JsEngineException.
+
+Document combines HostScriptSource, ClassicScriptSource, Promises, ExoticObjects,
+GlobalIsVariableScope, ReentrantHostCalls and BinaryData. It claims those seven flags, each witnessed
+separately, and nothing more. It does not imply complete ECMAScript support or integration into an
+external browser. Flag values are public contract and are pinned by a test; a new flag takes a new bit.
 
 | Capability | Broiler.JS | Broiler.VM |
 | --- | --- | --- |
@@ -165,21 +253,103 @@ It does not imply complete ECMAScript support or integration into an external br
 | Promises, ExoticObjects | Yes | Yes |
 | GlobalIsVariableScope, ReentrantHostCalls | Yes | Yes |
 | BinaryData | Yes; SharedArrayBuffer excluded from byte reads | Yes; creation checks binary intrinsics |
+| StructuredClone | Yes | No; the profile's carrier arrives with the next VM pin (I18) |
 | WorkerRealms | Yes, including structured clone transfer | No |
 | Modules, DynamicImport | Only when ModuleSupport returns true | No |
 
 The [JS provider](../Broiler.JSeal.BroilerJs/BroilerJsEngineProvider.cs) treats a missing, false or
 throwing ModuleSupport callback as unsupported. Its Modules package also supplies ordinary arguments
-objects; that dependency is not proof of module integration. JSEAL has no module-loader/evaluation
-contract. The coverage table in [JsealConformanceTests.cs](../Broiler.JSeal.Tests/JsealConformanceTests.cs)
-exempts Modules and DynamicImport as not expressible and maps other declared flags to tests.
-This is an inventory check, not proof of complete engine semantics.
+objects; that dependency is not proof of module integration. A true callback describes the host's own
+module integration, not the JSEAL module contract below.
+
+### Modules
+
+The optional module contract designed by I09 exists since I10: `IJsModules`, `IJsModuleHost`,
+`IJsModuleMap`, `IJsModule` and their value types, in the contracts assembly with no new references.
+No provider advertises Modules or DynamicImport for the contract yet (the host-asserted ModuleSupport
+callback above is separate), and no realm from a registered provider or from adoption implements
+`IJsModules`. The Broiler.JS adapter is reached only through an internal, test-only provider option
+until I13. It runs static graphs through the engine's own module loader, compiles module code strict,
+and refuses, at link time and with the reason, the graphs it can see the pinned engine would run
+wrongly, including every module that contains `import()`; the VM adapter is I11. [The module contract design](jseal.modules.md#i10-implementation-status) records what
+the adapter does, each refusal, and the remaining gaps.
+
+### Capability coverage
+
+[JsealConformanceTests.Capabilities.cs](../Broiler.JSeal.Tests/JsealConformanceTests.Capabilities.cs)
+accounts for every single flag, for every registered provider:
+
+- **Witness.** Each flag has one named witness theory. Its rows come from `EnginesDeclaring`, so it runs
+  for each provider that declares the flag, plus any flag the witness needs to observe the result.
+  It does not run for other providers. A witness asserts that its realm has the capability and does not
+  return early without it. Other capability-dependent theories choose their rows in the same way.
+- **Refusal.** Each flag a provider does not declare that gates a contract member gets its own row of
+  `AnUndeclaredCapabilityIsAnExplicitRefusalNotAPass`. That row asserts the realm lacks the flag and
+  calls the gated member, which must throw JsCapabilityUnavailableException, the contract's documented
+  rule and nothing more. Test reports therefore list each refusal by provider and flag. A refusal is
+  never counted as a witness. Only the WorkerRealms and StructuredClone refusals (broiler-vm) run
+  today; the other specified refusals are checked only for existence until a provider without the
+  flag is registered.
+- **Absence only.** GlobalIsVariableScope and ReentrantHostCalls gate no member, and the contract does
+  not say what an engine without them does. Their rows,
+  `AnUndeclaredCapabilityWithNoGatedMemberIsOnlyAbsent`, assert only that the realm does not declare
+  them. No registered provider produces one.
+- **Gap.** Modules and DynamicImport have no witness yet. The module API is designed in I09
+  ([the module contract design](jseal.modules.md)) and exists since I10; its provider-neutral cases
+  run through the providers' internal gate, and I13 turns them into these witnesses. Until then, a
+  provider declaring either flag fails the suite. A provider that does not declare them gets a row of
+  `AnUndeclaredCapabilityWithNoContractIsARecordedGap`, never a refusal row, and the two missing
+  witnesses appear in every run as skipped tests (`TheModulesWitnessIsNotExercisedUntilI13`,
+  `TheDynamicImportWitnessIsNotExercisedUntilI13`).
+
+A kind with no row in a build (for example refusals in Release, where broiler-js declares every flag
+but the gaps) reports one placeholder row, `(no registered provider lacks one)`, which asserts that
+the kind really is empty; xUnit 2 fails a theory with no data.
+
+Meta-tests resolve witness names by reflection and check that each witness takes rows from its own
+flag, requiring at most HostScriptSource besides it, so a provider that declares a flag without some
+unrelated one is still witnessed. They also check that every provider/flag pair is witnessed,
+refused, absent-only or a recorded gap, exactly once. A removed
+witness, a renamed witness or a provider dropped from witness rows fails the suite. In Release-VM,
+the suite checks registered identities rather than a count: both broiler-js and broiler-vm run the
+Document witnesses; broiler-js witnesses WorkerRealms and StructuredClone; broiler-vm reports two
+refusals. Release registers only broiler-js. These checks inventory capability claims. They do not
+prove complete engine semantics.
+
+**Same-realm structured clone (StructuredClone, I18).** J18 decided that same-realm cloning needs its
+own flag on a new bit before any provider has only one half, and I18 adopts it: `StructuredClone`
+(`1 << 11`) gates `Clone` and makes `ClassifyTransferable` meaningful; WorkerRealms gates `Detach`
+and `Adopt`. Every provider that declares WorkerRealms also declares StructuredClone. Existing values
+are not renumbered, and a host that still checks WorkerRealms before `Clone` stays correct, only
+narrower. The shared cases in
+[JsealConformanceTests.StructuredClone.cs](../Broiler.JSeal.Tests/JsealConformanceTests.StructuredClone.cs)
+cover cycles, the brands the engines support, uncloneable values, holes, accessors, primitive
+wrappers and array properties, transfer failure atomicity, source detachment and destination-realm
+ownership. The VM provider declares neither flag on its pinned packages.
+
+The flag says that `Clone` works and that a refused value fails with `JsEngineException`; it does not
+certify that a provider's engine answers every value as HTML's StructuredSerialize does. The known
+deviations of the declaring provider, each pinned by a recorded gap in the shared cases so that a fix
+fails the suite until the gap is removed:
+
+| Value | HTML | Broiler.JS 0.1.0-preview.1 |
+| --- | --- | --- |
+| Symbol, WeakMap, WeakSet, Proxy, Promise | DataCloneError | Symbol returned as is; the others copied as plain objects |
+| RangeError and the other native error types | Name kept | Rebuilt as `Error` |
+| Array with holes, or with non-index properties | Length and properties kept | Holes compacted (the copy is shorter), properties dropped |
+| Accessor property | Value read through the getter | Dropped |
+| Boolean, Number and String objects | Brand and value kept | Empty plain object |
+| BigInt object | Brand and value kept | Plain object (a BigInt primitive is kept) |
+
+A host that must give pages HTML's exact answers on Broiler.JS checks these values itself before
+calling `Clone`. The Broiler.JS rows are an upstream clone fix taken through a pin update.
 
 The [VM provider](../Broiler.JSeal.Vm/VmEngineProvider.cs) owns one runtime, verified bootstrap artifact
 and instance per realm. It reuses the active execution step for callbacks and opens a host turn for
 external calls. Promise creation uses the captured intrinsic constructor without source evaluation.
-Binary operations and some exotic behavior also use captured intrinsics. Clone, Detach and Adopt
-refuse WorkerRealms; ClassifyTransferable returns NotTransferable on a live VM realm. These mechanisms
+Binary operations and some exotic behavior also use captured intrinsics. Clone refuses
+StructuredClone, Detach and Adopt refuse WorkerRealms, and ClassifyTransferable returns
+NotTransferable on a live VM realm. These mechanisms
 do not expand the threading contract or provide unhandled-rejection reporting.
 
 ## Registration and selection

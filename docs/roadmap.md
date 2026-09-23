@@ -1,9 +1,25 @@
 # Broiler.JSeal roadmap
 
-Planning baseline: 2026-09-19. This is a proposed implementation plan following the component
-review, not a record that the proposed fixes have shipped. **J00 and J02-J14 are complete; J01 is implemented
-with Linux validation pending.** All other slices are not started. The existing package baseline
-is `0.1.0-preview.1`; these changes have not been published.
+Planning baseline: 2026-09-19. This is an implementation plan following the component review. Status
+on 2026-09-22: **J00, J02-J16, J18, J19 and I09 are complete**; J01 is implemented with Linux
+validation pending, and J17, I10, I12 and I18 are partial. In the sibling Broiler.VM working tree
+V01-V15 (V13 as the design record that V14-V15 implement), F01-F22, B01-B05, B07 and B08 are
+implemented (F07-F09 on archived Unicode 17 data), B06's VM half is implemented, BigInt is admitted
+through an optional surface, the VM halves of I01, I03, I05, I07, I11 and I12 and I14-I17 are
+implemented, and D01-D04 are proposed decision records; that VM work is local validation only and is
+not in any released package. The Broiler.JS working tree has the module semantics and core fixes I10
+needs, also unreleased. JSeal adoption of the VM work (I02, I04, I06, I08, J17's last item, I11,
+I12's VM routing, I18's VM clone and B06's VM half) is prepared and validated against a local VM
+candidate but waits for a VM release. Remaining: I13, I18's WorkerRealms, and merging the prepared
+adoption (including B06's VM-dependent half) once a VM release exists. Nothing here has been
+published; the existing package baseline is `0.1.0-preview.1`.
+
+**Where the prepared adoption is.** Several statuses below name a patch file, such as
+`jseal-vm-next3-over-normal.patch`. Those are not in this repository and are not meant to be: they
+hold the code that only compiles against Broiler.VM host APIs no package carries yet, kept outside
+the tree so that what is merged here always builds against the pinned packages. Each such status
+says which local candidate it was validated against; the work is re-created against the released
+package when the pin moves, and the figures quoted for it hold only of that unpublished candidate.
 
 The objective is to make JSeal's behavior reliable across providers, simplify the adapters, and
 close selected Broiler.VM gaps against current Broiler.JS. Correct ECMAScript behavior is the

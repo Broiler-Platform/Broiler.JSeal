@@ -13,18 +13,14 @@ public partial class JsealConformanceTests
     // â”€â”€ exotic objects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource)]
     public void AnOrdinaryPropertyWinsOverTheExoticHandler(string engine)
     {
         using var realm = NewRealm(engine);
 
         var handler = new RecordingExotic();
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-        {
-            Assert.Throws<JsCapabilityUnavailableException>(() => realm.NewExotic(handler));
-            return;
-        }
+        AssertHas(realm, JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource);
 
         var collection = realm.NewExotic(handler);
 
@@ -74,18 +70,14 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void AnExoticObjectEnumeratesItsIndicesAndItsSupportedNames(string engine)
     {
         using var realm = NewRealm(engine);
 
         var handler = new RecordingExotic();
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-        {
-            Assert.Throws<JsCapabilityUnavailableException>(() => realm.NewExotic(handler));
-            return;
-        }
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var collection = realm.NewExotic(handler);
         realm.DefineValue(collection, "item", JsValue.String("the method"));
@@ -131,18 +123,14 @@ public partial class JsealConformanceTests
     /// ask rather than installed, and states why installing would be the shorter wrong answer.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void AnExoticObjectsSupportedNamesReachObjectKeysAndSpread(string engine)
     {
         using var realm = NewRealm(engine);
 
         var handler = new RecordingExotic();
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-        {
-            Assert.Throws<JsCapabilityUnavailableException>(() => realm.NewExotic(handler));
-            return;
-        }
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var collection = realm.NewExotic(handler);
         realm.DefineValue(collection, "item", JsValue.String("the method"));
@@ -170,13 +158,12 @@ public partial class JsealConformanceTests
     /// </para>
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void ADeletionOnAnExoticObjectReachesTheHandlerAndTakesTheNameWithIt(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-            return;
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var handler = new DeletingExotic();
         var area = realm.NewExotic(handler);
@@ -212,13 +199,12 @@ public partial class JsealConformanceTests
     /// <c>WebStorageTests.ADigitOnlyKeyIsANamedPropertyLikeAnyOther</c> is still skipped.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void ADigitOnlyKeyDoesNotReachTheDeleteHook(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-            return;
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var handler = new DeletingExotic();
         realm.DefineValue(realm.Global, "area", realm.NewExotic(handler));
@@ -243,13 +229,12 @@ public partial class JsealConformanceTests
     /// <c>Reflect.deleteProperty</c> is what closes it.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void ASymbolKeyedDeletionRemovesThePropertyAndIsNotOfferedToTheHandler(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-            return;
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var handler = new DeletingExotic();
         realm.DefineValue(realm.Global, "area", realm.NewExotic(handler));
@@ -281,13 +266,12 @@ public partial class JsealConformanceTests
     /// contract would fix its deletions and break its enumeration.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void ADeletingExoticIsReadAndEnumeratedExactlyAsAPlainOneIs(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-            return;
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var handler = new DeletingExotic();
         var area = realm.NewExotic(handler);
@@ -319,13 +303,12 @@ public partial class JsealConformanceTests
     /// and this test is here so a later reader knows it was decided rather than missed.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects)]
     public void AnExoticObjectWithNoDeleteHookIsUnchangedByThisContract(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.ExoticObjects))
-            return;
+        AssertHas(realm, JsCapabilities.ExoticObjects);
 
         var handler = new RecordingExotic();
         realm.DefineValue(realm.Global, "collection", realm.NewExotic(handler));
@@ -444,5 +427,70 @@ public partial class JsealConformanceTests
 
         public uint IndexedLength => Count;
     }
-}
 
+    /// <summary>
+    /// A page that replaces <c>Proxy</c> or <c>Reflect.deleteProperty</c> changes nothing about an
+    /// exotic object the host mints afterwards, or about how a deletion on it is completed.
+    /// </summary>
+    /// <remarks>
+    /// <b>Both are writable globals, and the object is minted after the page has run.</b> A provider
+    /// that reached either when a storage area was minted, or when a deletion was completed, would
+    /// hand the page every exotic object the bridge builds, or let it decide what a deletion
+    /// answers. The replacements count their calls and the count must stay zero, while the
+    /// deletion still reaches the handler once and the ordinary deletion still runs.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource)]
+    public void APageThatReplacesProxyOrReflectDoesNotChangeAnExoticDeletion(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource);
+
+        realm.EvaluateHostScript(
+            "globalThis.pageCalls = 0;" +
+            "globalThis.Proxy = function () { globalThis.pageCalls++; return {}; };" +
+            "Reflect.deleteProperty = function () { globalThis.pageCalls++; return false; };",
+            "test:replace-proxy");
+
+        var handler = new DeletingExotic();
+        var area = realm.NewExotic(handler);
+        realm.DefineValue(realm.Global, "area", area);
+
+        // Identity: the value the host minted is the one the page sees.
+        Assert.True(realm.GetProperty(realm.Global, "area") == area);
+
+        realm.EvaluateHostScript("area.stored = 'written'; area.kept = 'too';", "test:replaced-write");
+        Assert.Equal("true", Eval(realm, "String(delete area.stored)", "test:replaced-delete"));
+        Assert.Equal("undefined", Eval(realm, "String(area.stored)", "test:replaced-gone"));
+        Assert.Equal("too", Eval(realm, "area.kept", "test:replaced-kept"));
+        Assert.Equal(["stored"], handler.Deletions);
+
+        // The original Reflect.deleteProperty, kept by nobody, is not what completes this: the page's
+        // replacement answering false must not have been consulted.
+        Assert.Equal(0, realm.GetProperty(realm.Global, "pageCalls").AsNumber);
+    }
+
+    /// <summary>
+    /// The named/index boundary at its edges: the largest index is not offered, the first
+    /// non-index integer string and a negative one are, and each is offered once per deletion
+    /// whichever route performs it.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource)]
+    public void TheDeletionBoundaryHoldsAtTheArrayIndexLimitAndOnEveryRoute(string engine)
+    {
+        using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.ExoticObjects | JsCapabilities.HostScriptSource);
+
+        var handler = new DeletingExotic();
+        realm.DefineValue(realm.Global, "area", realm.NewExotic(handler));
+
+        realm.EvaluateHostScript(
+            "delete area['4294967294']; delete area['4294967295']; delete area['-1'];" +
+            "Reflect.deleteProperty(area, 'viaReflect');" +
+            "delete area[Symbol.iterator];",
+            "test:boundary-delete");
+
+        Assert.Equal(["4294967295", "-1", "viaReflect"], handler.Deletions);
+    }
+}

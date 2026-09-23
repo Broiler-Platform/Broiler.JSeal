@@ -32,6 +32,7 @@ internal sealed partial class VmRealm : IJsRealm
     private readonly VmInstance _instance;
     private readonly VmHostBridge _bridge;
     private readonly VmSourceProvider _sources;
+    private readonly JsRealmOptions _options;
 
     private bool _disposed;
 
@@ -41,6 +42,7 @@ internal sealed partial class VmRealm : IJsRealm
         VmInstance instance,
         VmHostBridge bridge,
         VmSourceProvider sources,
+        JsRealmOptions options,
         JsCapabilities capabilities,
         string engineName)
     {
@@ -49,6 +51,7 @@ internal sealed partial class VmRealm : IJsRealm
         _instance = instance;
         _bridge = bridge;
         _sources = sources;
+        _options = options;
         Capabilities = capabilities;
         EngineName = engineName;
     }

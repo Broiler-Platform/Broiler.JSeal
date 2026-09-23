@@ -1,0 +1,182 @@
+interface Broiler.JSeal.IJsCalls
+    public Construct(Broiler.JSeal.JsValue constructor, System.ReadOnlySpan<Broiler.JSeal.JsValue> arguments = default) : Broiler.JSeal.JsValue
+    public DomError(System.String name, System.String message) : System.Exception
+    public Error(Broiler.JSeal.JsErrorKind kind, System.String message) : System.Exception
+    public Invoke(Broiler.JSeal.JsValue function, Broiler.JSeal.JsValue thisValue, System.ReadOnlySpan<Broiler.JSeal.JsValue> arguments = default) : Broiler.JSeal.JsValue
+interface Broiler.JSeal.IJsClone
+    public Adopt(Broiler.JSeal.JsDetachedValue detached) : Broiler.JSeal.JsValue
+    public ClassifyTransferable(Broiler.JSeal.JsValue value) : Broiler.JSeal.JsTransferKind
+    public Clone(Broiler.JSeal.JsValue value, System.ReadOnlySpan<Broiler.JSeal.JsValue> transfer = default) : Broiler.JSeal.JsValue
+    public Detach(Broiler.JSeal.JsValue value, System.ReadOnlySpan<Broiler.JSeal.JsValue> transfer = default) : Broiler.JSeal.JsDetachedValue
+interface Broiler.JSeal.IJsEngineProvider
+    public Broiler.JSeal.JsCapabilities Capabilities { get; }
+    public CreateRealm(Broiler.JSeal.JsRealmOptions options) : Broiler.JSeal.IJsRealm
+    public System.String Description { get; }
+    public System.String Name { get; }
+interface Broiler.JSeal.IJsExotic
+    public System.Collections.Generic.IReadOnlyList<System.String> SupportedNames { get; }
+    public System.UInt32 IndexedLength { get; }
+    public TryGetIndex(System.UInt32 index, out Broiler.JSeal.JsValue value) : System.Boolean
+    public TryGetNamed(System.String name, out Broiler.JSeal.JsValue value) : System.Boolean
+    public TrySetNamed(System.String name, Broiler.JSeal.JsValue value) : System.Boolean
+interface Broiler.JSeal.IJsExoticDelete
+    public TryDeleteNamed(System.String name) : System.Boolean
+interface Broiler.JSeal.IJsJobs
+    public DrainJobs(System.Int32 limit = 10000) : System.Int32
+    public EnqueueJob(System.Action job) : System.Void
+    public NewPromise(out System.Action<Broiler.JSeal.JsValue> resolve, out System.Action<Broiler.JSeal.JsValue> reject) : Broiler.JSeal.JsValue
+    public System.Boolean HasPendingJobs { get; }
+interface Broiler.JSeal.IJsMembers
+    public DefineAccessor(Broiler.JSeal.JsValue target, System.String name, Broiler.JSeal.JsNativeFunction getter, Broiler.JSeal.JsNativeFunction? setter, Broiler.JSeal.JsPropertyFlags flags = 7) : System.Void
+    public DefineIndex(Broiler.JSeal.JsValue target, System.UInt32 index, Broiler.JSeal.JsValue value, Broiler.JSeal.JsPropertyFlags flags = 7) : System.Void
+    public DefineValue(Broiler.JSeal.JsValue target, System.String name, Broiler.JSeal.JsValue value, Broiler.JSeal.JsPropertyFlags flags = 7) : System.Void
+    public DeleteProperty(Broiler.JSeal.JsValue target, System.String name) : System.Boolean
+    public GetIndex(Broiler.JSeal.JsValue target, System.UInt32 index) : Broiler.JSeal.JsValue
+    public GetProperty(Broiler.JSeal.JsValue target, System.String name) : Broiler.JSeal.JsValue
+    public GetPrototype(Broiler.JSeal.JsValue target) : Broiler.JSeal.JsValue
+    public HasProperty(Broiler.JSeal.JsValue target, System.String name) : System.Boolean
+    public OwnPropertyNames(Broiler.JSeal.JsValue target) : System.Collections.Generic.IReadOnlyList<System.String>
+    public SetProperty(Broiler.JSeal.JsValue target, System.String name, Broiler.JSeal.JsValue value) : System.Void
+    public SetPrototype(Broiler.JSeal.JsValue target, Broiler.JSeal.JsValue prototype) : System.Void
+interface Broiler.JSeal.IJsRealm : Broiler.JSeal.IJsCalls, Broiler.JSeal.IJsClone, Broiler.JSeal.IJsJobs, Broiler.JSeal.IJsMembers, Broiler.JSeal.IJsSource, Broiler.JSeal.IJsValues, System.IDisposable
+    public Broiler.JSeal.JsCapabilities Capabilities { get; }
+    public Broiler.JSeal.JsValue Global { get; }
+    public System.String EngineName { get; }
+interface Broiler.JSeal.IJsRealmAdoption
+    public TryAdopt(System.Object engineRealm, Broiler.JSeal.JsRealmOptions options, [NotNullWhen(True)] out Broiler.JSeal.IJsRealm? realm) : System.Boolean
+interface Broiler.JSeal.IJsSource
+    public EvaluateClassicScript(System.String source, System.String label) : Broiler.JSeal.JsValue
+    public EvaluateDynamicSource(System.String source, System.String label) : Broiler.JSeal.JsValue
+    public EvaluateHostScript(System.String source, System.String label) : Broiler.JSeal.JsValue
+interface Broiler.JSeal.IJsValues
+    public NewArray(System.ReadOnlySpan<Broiler.JSeal.JsValue> elements = default) : Broiler.JSeal.JsValue
+    public NewArrayBuffer(System.ReadOnlySpan<System.Byte> bytes) : Broiler.JSeal.JsValue
+    public NewConstructor(System.String name, Broiler.JSeal.JsNativeFunction body, System.Int32 length = 0) : Broiler.JSeal.JsValue
+    public NewExotic(Broiler.JSeal.IJsExotic handler) : Broiler.JSeal.JsValue
+    public NewMethod(System.String name, Broiler.JSeal.JsNativeFunction body, System.Int32 length = 0) : Broiler.JSeal.JsValue
+    public NewObject() : Broiler.JSeal.JsValue
+    public ToBoolean(Broiler.JSeal.JsValue value) : System.Boolean
+    public ToJsString(Broiler.JSeal.JsValue value) : System.String
+    public ToNumber(Broiler.JSeal.JsValue value) : System.Double
+    public TryGetArrayBufferBytes(Broiler.JSeal.JsValue value, [NotNullWhen(True)] out System.Byte[]? bytes) : System.Boolean
+readonly ref struct Broiler.JSeal.JsCall
+    public Broiler.JSeal.IJsRealm Realm { get; }
+    public Broiler.JSeal.JsValue NewTarget { get; }
+    public Broiler.JSeal.JsValue This { get; }
+    public Broiler.JSeal.JsValue this[System.Int32 index] { get; }
+    public System.Int32 Length { get; }
+    public System.ReadOnlySpan<Broiler.JSeal.JsValue> Arguments { get; }
+    public ctor(Broiler.JSeal.IJsRealm realm, Broiler.JSeal.JsValue thisValue, System.ReadOnlySpan<Broiler.JSeal.JsValue> arguments, Broiler.JSeal.JsValue newTarget = default)
+[Flags] enum Broiler.JSeal.JsCapabilities : UInt32
+    BinaryData = 512
+    ClassicScriptSource = 1024
+    Document = 1905
+    DynamicImport = 8
+    ExoticObjects = 32
+    GlobalIsVariableScope = 64
+    GuestEval = 2
+    HostScriptSource = 1
+    Modules = 4
+    None = 0
+    Promises = 16
+    ReentrantHostCalls = 256
+    WorkerRealms = 128
+sealed class Broiler.JSeal.JsCapabilityUnavailableException : System.Exception, System.Runtime.Serialization.ISerializable
+    public Broiler.JSeal.JsCapabilities Missing { get; }
+    public System.String EngineName { get; }
+    public ctor(System.String engineName, Broiler.JSeal.JsCapabilities missing)
+sealed class Broiler.JSeal.JsDetachedValue
+    public System.String EngineName { get; }
+sealed class Broiler.JSeal.JsEngineException : System.Exception, System.Runtime.Serialization.ISerializable
+    public Broiler.JSeal.JsValue Thrown { get; }
+    public System.String? ScriptStackTrace { get; init; }
+    public ctor(System.String message, Broiler.JSeal.JsValue thrown, System.Exception? innerException = null)
+    public ctor(System.String message, System.Exception? innerException = null)
+static class Broiler.JSeal.JsEngineRegistry
+    public static Broiler.JSeal.IJsEngineProvider Default { get; }
+    public static Find(System.String name) : Broiler.JSeal.IJsEngineProvider?
+    public static Register(Broiler.JSeal.IJsEngineProvider provider) : System.Void
+    public static Reset() : System.Void
+    public static SetDefault(System.String name) : System.Void
+    public static System.Boolean HasAny { get; }
+    public static System.Collections.Generic.IReadOnlyCollection<Broiler.JSeal.IJsEngineProvider> All { get; }
+    public static Unregister(System.String name) : System.Boolean
+    public static const System.String SelectionEnvironmentVariable
+enum Broiler.JSeal.JsErrorKind : Int32
+    Error = 0
+    RangeError = 2
+    ReferenceError = 4
+    SyntaxError = 3
+    TypeError = 1
+delegate Broiler.JSeal.JsNativeFunction
+    Invoke(in Broiler.JSeal.JsCall call) : Broiler.JSeal.JsValue
+[Flags] enum Broiler.JSeal.JsPropertyFlags : Byte
+    Configurable = 2
+    Default = 7
+    Enumerable = 1
+    NonEnumerable = 6
+    None = 0
+    Writable = 4
+sealed class Broiler.JSeal.JsRealmOptions
+    public System.Boolean AllowGuestEval { get; init; }
+    public System.Boolean ForceStrictMode { get; init; }
+    public System.String? DocumentUrl { get; init; }
+    public ctor()
+    public static Broiler.JSeal.JsRealmOptions Default { get; }
+enum Broiler.JSeal.JsTransferKind : Int32
+    Detached = 2
+    NotTransferable = 0
+    Transferable = 1
+readonly struct Broiler.JSeal.JsValue : System.IEquatable<Broiler.JSeal.JsValue>
+    public Broiler.JSeal.JsValueKind Kind { get; }
+    public Equals(Broiler.JSeal.JsValue other) : System.Boolean
+    public Equals(System.Object? obj) : System.Boolean
+    public GetHashCode() : System.Int32
+    public System.Boolean AsBoolean { get; }
+    public System.Boolean IsArray { get; }
+    public System.Boolean IsBoolean { get; }
+    public System.Boolean IsFunction { get; }
+    public System.Boolean IsMissing { get; }
+    public System.Boolean IsNull { get; }
+    public System.Boolean IsNullish { get; }
+    public System.Boolean IsNumber { get; }
+    public System.Boolean IsObject { get; }
+    public System.Boolean IsString { get; }
+    public System.Boolean IsUndefined { get; }
+    public System.Double AsNumber { get; }
+    public System.Object? ObjectIdentity { get; }
+    public System.Object? Reference { get; }
+    public System.String? AsString { get; }
+    public ToString() : System.String
+    public static Boolean(System.Boolean value) : Broiler.JSeal.JsValue
+    public static Broiler.JSeal.JsValue False { get; }
+    public static Broiler.JSeal.JsValue Missing { get; }
+    public static Broiler.JSeal.JsValue Null { get; }
+    public static Broiler.JSeal.JsValue True { get; }
+    public static Broiler.JSeal.JsValue Undefined { get; }
+    public static Number(System.Double value) : Broiler.JSeal.JsValue
+    public static String(System.String? value) : Broiler.JSeal.JsValue
+    public static op_Equality(Broiler.JSeal.JsValue left, Broiler.JSeal.JsValue right) : System.Boolean
+    public static op_Inequality(Broiler.JSeal.JsValue left, Broiler.JSeal.JsValue right) : System.Boolean
+enum Broiler.JSeal.JsValueKind : Byte
+    Array = 10
+    BigInt = 7
+    Boolean = 3
+    Function = 9
+    Missing = 0
+    Null = 2
+    Number = 4
+    Object = 8
+    String = 5
+    Symbol = 6
+    Undefined = 1
+static class Broiler.JSeal.Providers.JsProviderClone
+    public static Detached(System.String engineName, System.Object? payload) : Broiler.JSeal.JsDetachedValue
+    public static PayloadOf(Broiler.JSeal.JsDetachedValue detached) : System.Object?
+static class Broiler.JSeal.Providers.JsProviderValue
+    public static Array(System.Object reference) : Broiler.JSeal.JsValue
+    public static BigInt(System.Object reference) : Broiler.JSeal.JsValue
+    public static Function(System.Object reference) : Broiler.JSeal.JsValue
+    public static Object(System.Object reference) : Broiler.JSeal.JsValue
+    public static ReferenceOf(Broiler.JSeal.JsValue value) : System.Object?
+    public static Symbol(System.Object reference) : Broiler.JSeal.JsValue
