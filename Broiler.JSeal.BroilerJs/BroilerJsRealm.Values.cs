@@ -131,7 +131,7 @@ internal partial class BroilerJsRealm
     /// <remarks>
     /// <c>DoubleValue</c> is the engine's coercion, not a field read: on an object it runs
     /// <c>ToPrimitive</c> with a number hint, which may reach a <c>valueOf</c> the page wrote, and on
-    /// a Symbol it throws â€” as the specification says it must.
+    /// a Symbol it throws — as the specification says it must.
     /// </remarks>
     public double ToNumber(JsValue value) =>
         Execute(value, static item => BroilerJsMarshal.Unwrap(item).DoubleValue);

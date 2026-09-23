@@ -12,6 +12,10 @@ namespace Broiler.JSeal.Vm;
 internal static class VmMarshal
 {
     /// <summary>A VM value as a JSEAL handle.</summary>
+    /// <remarks>
+    /// A BigInt is boxed once per crossing, so two handles to one guest BigInt are different
+    /// references; value equality is <see cref="VmRealm.IsStrictlyEqual"/>'s, as the contract says.
+    /// </remarks>
     internal static JsValue Wrap(JsHostValue value) => value.Kind switch
     {
         JsHostValueKind.Missing => JsValue.Missing,
@@ -20,6 +24,8 @@ internal static class VmMarshal
         JsHostValueKind.Boolean => JsValue.Boolean(value.AsBoolean()),
         JsHostValueKind.Number => JsValue.Number(value.AsNumber()),
         JsHostValueKind.String => JsValue.String(value.AsString()),
+        // Opaque, as the contract says: the box carries the exact integer back through Unwrap.
+        JsHostValueKind.BigInt => JsProviderValue.BigInt(value),
         JsHostValueKind.Symbol => JsProviderValue.Symbol(Identity(value)),
         JsHostValueKind.Function => JsProviderValue.Function(Identity(value)),
         JsHostValueKind.Array => JsProviderValue.Array(Identity(value)),
@@ -43,6 +49,10 @@ internal static class VmMarshal
     /// the profile resolves it to its uninitialised-binding marker, and a guest reading the argument,
     /// property or callback result throws a ReferenceError instead of seeing <c>undefined</c>.
     /// </para>
+    /// <para>
+    /// A BigInt handle carries its <see cref="JsHostValue"/> box like an object handle does, so it
+    /// unwraps by the same test; another engine's BigInt carries something else and is refused.
+    /// </para>
     /// </remarks>
     internal static JsHostValue Unwrap(JsValue value) => value.Kind switch
     {
@@ -52,9 +62,6 @@ internal static class VmMarshal
         JsValueKind.Boolean => JsHostValue.Boolean(value.AsBoolean),
         JsValueKind.Number => JsHostValue.Number(value.AsNumber),
         JsValueKind.String => JsHostValue.String(value.AsString!),
-        JsValueKind.BigInt => throw new JsEngineException(
-            "the Broiler.VM JavaScript profile has no BigInt, so a BigInt handle cannot have come "
-                + "from one of its realms"),
         _ => JsProviderValue.ReferenceOf(value) is JsHostValue carried
             ? carried
             : throw new JsEngineException(

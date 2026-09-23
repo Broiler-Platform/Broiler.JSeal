@@ -61,7 +61,12 @@ Pushes to main and pull requests build all libraries on Linux and Windows under 
 `Release-VM` configurations, run the conformance test suite against all registered providers, and
 run isolated package consumers. The Windows job also packs and verifies the NuGet packages.
 
-Publishing supports GitHub Packages and NuGet.org with automated preview versioning.
+Packages are published to nuget.org only, by the manually run `Publish` workflow (or a `v*` tag),
+which defaults to a dry run. The preview number is chosen automatically: one past the highest
+`X.Y.Z-preview.N` of any shipping package on nuget.org or on the retired GitHub Packages feed, which
+is still read as version history so that no preview number is ever reused. Every dependency outside
+the release must already be on nuget.org; the workflow proves that with an isolated consumer restore
+before it pushes. The packages carry their own README, [`eng/nuget/README.md`](eng/nuget/README.md).
 
 ## Build and Test
 

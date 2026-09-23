@@ -14,7 +14,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     public string Name => "broiler-js";
 
     /// <inheritdoc />
-    public string Description => "Broiler.JS â€” the from-scratch C# ECMAScript engine (Broiler.JavaScript).";
+    public string Description => "Broiler.JS — the from-scratch C# ECMAScript engine (Broiler.JavaScript).";
 
     /// <summary>Optional host evidence for static and dynamic module support.</summary>
     /// <remarks>
@@ -36,7 +36,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// <see cref="JsCapabilities.HostScriptSource"/>, <see cref="JsCapabilities.ClassicScriptSource"/>
     /// and <see cref="JsCapabilities.GuestEval"/> each name an <see cref="IJsSource"/> member, and all
     /// three members reach <c>JSContext.Eval</c>, which compiles at run time and does not distinguish
-    /// them â€” the distinction is the host's. GuestEval is the only one a realm can lose, and this
+    /// them — the distinction is the host's. GuestEval is the only one a realm can lose, and this
     /// provider enforces its absence in two places: at <c>EvaluateDynamicSource</c>
     /// (<c>BroilerJsRealm.Source.cs</c>), and at the page's own <c>eval</c>, <c>Function</c> at every
     /// arity and <c>ShadowRealm.prototype.evaluate</c> through the <c>EvalEvent</c> subscription in
@@ -49,7 +49,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// is what the bridge's Worker support already builds, and <see cref="JsCapabilities.StructuredClone"/>
     /// is the engine's own structured clone that both it and same-realm messaging use
     /// (<c>BroilerJsRealm.Clone.cs</c>);
-    /// <see cref="JsCapabilities.ReentrantHostCalls"/> is simply how the engine runs â€” a native
+    /// <see cref="JsCapabilities.ReentrantHostCalls"/> is simply how the engine runs — a native
     /// function may call <c>InvokeFunction</c> while the engine is inside it, which is what every
     /// event dispatch in the bridge does; and <see cref="JsCapabilities.BinaryData"/> is
     /// <c>JSArrayBuffer</c>, which <c>NewArrayBuffer</c> mints over a copy of the host's bytes and
@@ -104,11 +104,11 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// module capabilities.
     /// </para>
     /// <para>
-    /// <b>It adds no capability.</b> The pinned engine cannot keep every promise
-    /// <see cref="JsCapabilities.Modules"/> makes (live bindings, the namespace exotic object, cyclic
-    /// graphs; see <c>docs/jseal.modules.md</c>), so a gated realm reports the same flags as any
-    /// other realm from this provider, and the adapter refuses at link time the graphs it knows it
-    /// would run wrongly. Adopted realms never implement the interface.
+    /// <b>It adds no capability.</b> Broiler.JS 0.1.0-preview.3 keeps the module semantics
+    /// <see cref="JsCapabilities.Modules"/> promises, but the adapter does not route <c>import()</c>
+    /// through the map, refusing a module that calls it at link time, and publishing the flags is I13's
+    /// decision (see <c>docs/jseal.modules.md</c>). A gated realm therefore reports the same flags as
+    /// any other realm from this provider. Adopted realms never implement the interface.
     /// </para>
     /// </remarks>
     internal bool EnableModuleContract { get; init; }
@@ -125,7 +125,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     /// The type test is what makes this safe to offer to every provider in turn: a host with two
     /// engines linked hands the same object to both, and the one that did not make it must say so
     /// rather than wrap something it cannot drive. <c>JSModuleContext</c> derives from
-    /// <c>JSContext</c>, so a module context adopts too â€” which is what the bridge's module path
+    /// <c>JSContext</c>, so a module context adopts too — which is what the bridge's module path
     /// needs, since that is the realm a page's <c>&lt;script type="module"&gt;</c> runs in.
     /// </remarks>
     public bool TryAdopt(object engineRealm, JsRealmOptions options, [NotNullWhen(true)] out IJsRealm? realm)
@@ -143,7 +143,7 @@ public sealed class BroilerJsEngineProvider : IJsEngineProvider, IJsRealmAdoptio
     }
 
     /// <summary>
-    /// Puts this provider in the process-wide registry. Idempotent â€” re-registering replaces the
+    /// Puts this provider in the process-wide registry. Idempotent — re-registering replaces the
     /// entry under the same name, which is what <see cref="JsEngineRegistry.Register"/> promises.
     /// </summary>
     public static void Register() => JsEngineRegistry.Register(new BroilerJsEngineProvider());

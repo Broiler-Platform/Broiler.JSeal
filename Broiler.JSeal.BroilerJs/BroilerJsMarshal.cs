@@ -18,7 +18,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// them is a decision, not a cast: which JSEAL kind an engine object is minted under is answered once
 /// here and then carried in the handle (see <see cref="JsProviderValue"/>), and a second copy of that
 /// decision somewhere else in the provider is a second place for it to be answered differently. The
-/// two that would go wrong quietly are the ones this type exists to make unrepeatable â€” a CLR
+/// two that would go wrong quietly are the ones this type exists to make unrepeatable — a CLR
 /// <see langword="null"/> becoming <c>undefined</c> instead of <see cref="JsValue.Missing"/>, and a
 /// <c>JSContext</c> failing to be recognised as an object because the type test that caught it was
 /// written for <c>JSObject</c> in one file and for something narrower in another.
@@ -40,8 +40,8 @@ internal static class BroilerJsMarshal
     /// <see cref="JsValueKind.Missing"/> unwraps to <c>undefined</c>. That is not a contradiction of
     /// the distinction the contract draws: Missing means "the host never supplied a value", and the
     /// only thing that can be handed to an engine in place of a value it was promised is
-    /// <c>undefined</c>. The distinction is preserved in the direction it is observed â€” reading an
-    /// argument â€” and collapsed in the direction it cannot be.
+    /// <c>undefined</c>. The distinction is preserved in the direction it is observed — reading an
+    /// argument — and collapsed in the direction it cannot be.
     /// </remarks>
     internal static JSValue Unwrap(JsValue value) => value.Kind switch
     {
@@ -101,7 +101,7 @@ internal static class BroilerJsMarshal
             JSBoolean boolean => JsValue.Boolean(boolean.BooleanValue),
 
             // Symbols and BigInts stay opaque: neither has a lossless inline representation in a
-            // handle. This used to add "and the bridge never reads one â€” it only forwards them",
+            // handle. This used to add "and the bridge never reads one — it only forwards them",
             // which was false: every coercion a page can hand a BigInt to reads one, and the handle's
             // own truthiness read 0n as true until IJsValues.ToBoolean existed to ask. The last arm is
             // also wider than its name. It takes every engine primitive not matched above, and this

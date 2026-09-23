@@ -21,17 +21,17 @@ public partial class JsealConformanceTests
         new Dictionary<(string, string), string>
         {
             [("broiler-js", nameof(EverySharedBrandSurvivesACloneAsTheRealmsOwn))] =
-                "the pinned Broiler.JavaScript 0.1.0-preview.1 structured clone rebuilds a RangeError as a plain Error " +
+                "the pinned Broiler.JavaScript 0.1.0-preview.3 structured clone rebuilds a RangeError as a plain Error " +
                 "(HTML keeps the name of the six native error types); an upstream Broiler.JS clone fix and pin update",
             [("broiler-js", nameof(UncloneableValuesAreRefusedRatherThanCopiedInPart))] =
-                "the pinned Broiler.JavaScript 0.1.0-preview.1 structured clone copies a Symbol, and copies a WeakMap, a WeakSet, " +
+                "the pinned Broiler.JavaScript 0.1.0-preview.3 structured clone copies a Symbol, and copies a WeakMap, a WeakSet, " +
                 "a Proxy and a Promise as plain objects, instead of raising DataCloneError; an upstream Broiler.JS clone fix and pin update",
             [("broiler-js", nameof(ACloneKeepsHolesAccessorValuesWrappersAndArrayProperties))] =
-                "the pinned Broiler.JavaScript 0.1.0-preview.1 structured clone compacts an array's holes (shortening it), drops " +
+                "the pinned Broiler.JavaScript 0.1.0-preview.3 structured clone compacts an array's holes (shortening it), drops " +
                 "accessor properties instead of reading them, drops an array's non-index properties, and copies Boolean, Number " +
                 "and String objects as empty plain objects; an upstream Broiler.JS clone fix and pin update",
             [("broiler-js", nameof(ABigIntSurvivesAStructuredClone))] =
-                "the pinned Broiler.JavaScript 0.1.0-preview.1 structured clone copies a BigInt object as a plain object " +
+                "the pinned Broiler.JavaScript 0.1.0-preview.3 structured clone copies a BigInt object as a plain object " +
                 "(no [[BigIntData]] slot, not on BigInt.prototype) where HTML rebuilds a BigInt object; a BigInt primitive survives. " +
                 "An upstream Broiler.JS clone fix and pin update",
         };
@@ -237,4 +237,109 @@ public partial class JsealConformanceTests
                 "test:adopt-read"));
         Assert.True(sender.GetProperty(sender.Global, "adopted").IsUndefined);
     }
+
+#if BROILER_VM_JS
+    /// <summary>
+    /// The Broiler.VM provider with WorkerRealms declared, through its internal test gate: the two
+    /// halves of worker transport run, and the one clause they do not meet is pinned below.
+    /// </summary>
+    private static IJsEngineProvider VmWorkerRealmsProvider() =>
+        new Broiler.JSeal.Vm.VmEngineProvider { EnableWorkerRealms = true };
+
+    [Fact]
+    public void TheRegisteredVmProviderDeclaresSameRealmCloneButNotWorkerRealms()
+    {
+        var registered = Provider("broiler-vm");
+        Assert.True(registered.Capabilities.HasFlag(JsCapabilities.StructuredClone));
+        Assert.False(registered.Capabilities.HasFlag(JsCapabilities.WorkerRealms));
+
+        using var realm = registered.CreateRealm(JsRealmOptions.Default);
+        var copy = realm.Clone(realm.NewObject());
+        Assert.True(copy.IsObject);
+        Assert.Throws<JsCapabilityUnavailableException>(() => realm.Detach(copy));
+    }
+
+    [Fact]
+    public void VmWorkerTransportRunsOnTwoThreadsThroughTheGate()
+    {
+        var provider = VmWorkerRealmsProvider();
+        var page = provider.CreateRealm(JsRealmOptions.Default);
+        var message = page.EvaluateHostScript(
+            "(function () { var o = { text: 'from the page', when: new Date(8) }; o.self = o; return o; })()",
+            "test:vm-worker-send");
+        var sent = page.Detach(message);
+
+        // The sender is gone before the receiver adopts: a carrier holds data only.
+        page.Dispose();
+
+        string received = string.Empty;
+        JsDetachedValue? reply = null;
+        Exception? failure = null;
+
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                using var second = provider.CreateRealm(JsRealmOptions.Default);
+                second.DefineValue(second.Global, "inbound", second.Adopt(sent));
+                received = Eval(second,
+                    "[inbound.text, inbound.self === inbound, inbound.when instanceof Date, Object.getPrototypeOf(inbound) === Object.prototype].join()",
+                    "test:vm-worker-read");
+                reply = second.Detach(second.EvaluateHostScript("({ text: 'from the worker' })", "test:vm-worker-reply"));
+            }
+            catch (Exception raised)
+            {
+                failure = raised;
+            }
+        });
+
+        worker.Start();
+        Assert.True(worker.Join(TimeSpan.FromSeconds(30)), "the worker realm did not finish");
+        Assert.Null(failure);
+        Assert.Equal("from the page,true,true,true", received);
+
+        using var home = provider.CreateRealm(JsRealmOptions.Default);
+        Assert.Equal("from the worker", home.ToJsString(home.GetProperty(home.Adopt(reply!), "text")));
+
+        // Repeatable without a transfer list: two adoptions, two independent copies.
+        Assert.False(home.Adopt(reply!) == home.Adopt(reply!));
+    }
+
+    [Fact]
+    public void AVmCarrierHoldingATransferIsSingleUseWhichIsWhyWorkerRealmsIsUndeclared()
+    {
+        var provider = VmWorkerRealmsProvider();
+        using var realm = provider.CreateRealm(JsRealmOptions.Default);
+        var buffer = realm.EvaluateHostScript("(function () { var b = new ArrayBuffer(2); new Uint8Array(b)[0] = 4; return b; })()", "test:vm-single-use");
+
+        var carrier = realm.Detach(buffer, [buffer]);
+        Assert.Equal(JsTransferKind.Detached, realm.ClassifyTransferable(buffer));
+
+        Assert.True(realm.TryGetArrayBufferBytes(realm.Adopt(carrier), out var bytes));
+        Assert.Equal(new byte[] { 4, 0 }, bytes);
+
+        // IJsClone.Adopt says a carrier may be adopted more than once; this one may not. The profile
+        // refuses the second claim, and the refusal is explicit rather than a second copy.
+        var second = Assert.Throws<JsEngineException>(() => realm.Adopt(carrier));
+        var refusal = Assert.IsType<Broiler.VM.Profile.JavaScript.JsHostSurfaceException>(second.InnerException);
+        Assert.Equal(Broiler.VM.Profile.JavaScript.JsHostRefusal.CarrierConsumed, refusal.Refusal);
+    }
+
+    [Fact]
+    public void ACarrierFromTheOtherEngineIsRefusedByBothProviders()
+    {
+        using var vm = VmWorkerRealmsProvider().CreateRealm(JsRealmOptions.Default);
+        using var js = Provider("broiler-js").CreateRealm(JsRealmOptions.Default);
+
+        var fromVm = vm.Detach(vm.NewObject());
+        var fromJs = js.Detach(js.NewObject());
+
+        Assert.Throws<JsEngineException>(() => js.Adopt(fromVm));
+        Assert.Throws<JsEngineException>(() => vm.Adopt(fromJs));
+
+        // A carrier that names this engine but carries another engine's graph is the profile's own
+        // ForeignCarrier refusal.
+        Assert.Throws<JsEngineException>(() => vm.Adopt(Broiler.JSeal.Providers.JsProviderClone.Detached(vm.EngineName, new object())));
+    }
+#endif
 }

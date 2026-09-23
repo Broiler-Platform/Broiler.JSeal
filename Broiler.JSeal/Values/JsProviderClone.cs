@@ -5,7 +5,7 @@
 /// clone produced, and reads it back.
 /// </summary>
 /// <remarks>
-/// The same rule as <see cref="JsProviderValue"/>, for the same reasons â€” public so that a provider
+/// The same rule as <see cref="JsProviderValue"/>, for the same reasons — public so that a provider
 /// can be written outside this repository, in the <c>Providers</c> namespace so that a file which
 /// needs it says so in its usings, and never called by a binding. A host that could unwrap a carrier
 /// would be holding one realm's object graph on another realm's thread, which is precisely what

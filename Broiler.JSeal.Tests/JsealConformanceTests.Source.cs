@@ -10,7 +10,7 @@ namespace Broiler.JSeal.Tests;
 /// </summary>
 public partial class JsealConformanceTests
 {
-    // â”€â”€ source â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── source ─────────────────────────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
@@ -64,7 +64,7 @@ public partial class JsealConformanceTests
     /// waiting for a host to write one line.</b> <c>script-src</c> and <c>'unsafe-eval'</c> are
     /// different directives: a page served <c>script-src 'unsafe-inline'</c> runs every one of its
     /// script elements and no <c>eval</c>. With one member for both, a host that read a restrictive
-    /// policy and narrowed the realm â€” which the provider contract instructs it to do â€” would have
+    /// policy and narrowed the realm — which the provider contract instructs it to do — would have
     /// refused that page's ordinary scripts. Nothing in this repository had written that line yet,
     /// so the defect was latent rather than live, and this test is what stops it being written.
     /// </para>
@@ -115,7 +115,7 @@ public partial class JsealConformanceTests
     }
 
     /// <summary>
-    /// And the page's own <c>eval</c> and <c>Function</c> are refused inside that realm â€” which is
+    /// And the page's own <c>eval</c> and <c>Function</c> are refused inside that realm — which is
     /// where a browser refuses them, and where the capability had not been enforced at all.
     /// </summary>
     /// <remarks>
@@ -123,7 +123,7 @@ public partial class JsealConformanceTests
     /// <b>A capability that is declared false and enforced nowhere is worse than one that is
     /// absent</b>, because a host is entitled to branch on it without verifying it. Refusing at the
     /// host member alone refuses a door no page walks through: a page does not call a contract
-    /// member, it writes <c>eval('â€¦')</c>.
+    /// member, it writes <c>eval('…')</c>.
     /// </para>
     /// <para>
     /// <b>It also pins that permission to run a script is not permission for what that script asks
@@ -350,14 +350,14 @@ public partial class JsealConformanceTests
     /// </para>
     /// <para>
     /// <b>A value probe, not an exception probe.</b> Strictness is read from what <c>this</c> is
-    /// inside a plain call â€” <c>undefined</c> when strict, the global when not â€” so the assertion
+    /// inside a plain call — <c>undefined</c> when strict, the global when not — so the assertion
     /// does not depend on which error a provider raises for an undeclared assignment, and a provider
     /// that refused the probe outright would fail rather than look strict.
     /// </para>
     /// <para>
     /// The third realm is the control that makes the first two mean something: without it, a
-    /// provider that answered <c>"undefined"</c> for every plain call â€” because it never implemented
-    /// sloppy <c>this</c> at all â€” would satisfy the host assertion having demonstrated nothing about
+    /// provider that answered <c>"undefined"</c> for every plain call — because it never implemented
+    /// sloppy <c>this</c> at all — would satisfy the host assertion having demonstrated nothing about
     /// <c>ForceStrictMode</c>.
     /// </para>
     /// </remarks>

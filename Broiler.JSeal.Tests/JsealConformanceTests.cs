@@ -26,7 +26,7 @@ public partial class JsealConformanceTests
     /// </summary>
     /// <remarks>
     /// The name rather than the provider instance so that a failing case names the engine it failed
-    /// for â€” xUnit renders theory data into the test name, and an <see cref="IJsEngineProvider"/>
+    /// for — xUnit renders theory data into the test name, and an <see cref="IJsEngineProvider"/>
     /// renders as its type name at best. Reading a static member of this class is also what runs the
     /// type initializer above, so the registry is populated before it is enumerated.
     /// </remarks>
@@ -50,13 +50,13 @@ public partial class JsealConformanceTests
     private static string Eval(IJsRealm realm, string expression, string label = "test:probe") =>
         realm.ToJsString(realm.EvaluateHostScript(expression, label));
 
-    // â”€â”€ values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── values ─────────────────────────────────────────────────────────────────────────────────
     //
-    // JsValue is a struct in the contract assembly with no provider involvement â€” a handle's kind,
+    // JsValue is a struct in the contract assembly with no provider involvement — a handle's kind,
     // its truthiness and its equality are decided by the contracts alone, which is the whole reason
     // those members exist rather than being realm calls. So these are Facts: running them once per
-    // provider would assert the same code N times. The two value questions that DO need an engine â€”
-    // whether an object is truthy, and whether two object handles compare by identity â€” are
+    // provider would assert the same code N times. The two value questions that DO need an engine —
+    // whether an object is truthy, and whether two object handles compare by identity — are
     // theories further down, because minting an object is the provider's job.
 
     [Fact]
@@ -72,7 +72,7 @@ public partial class JsealConformanceTests
         Assert.Equal(JsValueKind.String, JsValue.String("s").Kind);
 
         // A CLR null string is the absent DOM value, and the DOM says that is null rather than the
-        // string "null" â€” JsValue.String documents this and 200-odd bridge sites depend on it.
+        // string "null" — JsValue.String documents this and 200-odd bridge sites depend on it.
         Assert.Equal(JsValueKind.Null, JsValue.String(null).Kind);
     }
 
@@ -126,7 +126,7 @@ public partial class JsealConformanceTests
     public void AsNumberDoesNotCoerceAStringAndAsStringDoesNotCoerceANumber()
     {
         // The cheap conversions answer only what the handle already knows; the coercions are on the
-        // realm because they can run page script â€” all but ToBoolean, which runs nothing and is on
+        // realm because they can run page script — all but ToBoolean, which runs nothing and is on
         // the realm because a handle cannot see inside a BigInt.
         Assert.True(double.IsNaN(JsValue.String("42").AsNumber));
         Assert.Equal(1d, JsValue.True.AsNumber);
@@ -173,8 +173,8 @@ public partial class JsealConformanceTests
         Assert.True(first.AsBoolean);
 
         // `{} === {}` is false and `x === x` is true. Across read paths a provider keeps identity only by
-        // handing back one canonical reference per guest object â€” the engine's own, or a box made once per
-        // identity (TwoHandlesForOneObjectAreEqualAndHashTheSame asserts it route by route) â€” which is
+        // handing back one canonical reference per guest object — the engine's own, or a box made once per
+        // identity (TwoHandlesForOneObjectAreEqualAndHashTheSame asserts it route by route) — which is
         // JsValue.ObjectIdentity, what the bridge's seven weak per-object tables key on.
         Assert.False(first == second);
 #pragma warning disable CS1718 // Comparing a handle to itself IS the assertion here.
@@ -281,10 +281,8 @@ public partial class JsealConformanceTests
     private static readonly IReadOnlyDictionary<string, BigIntSurface> BigIntSurfaces = new Dictionary<string, BigIntSurface>
     {
         ["broiler-js"] = new(Value: true, TypedArrays: true, DataViewAccessors: true),
-        // The pinned VM profile (0.1.0-preview.3) has no BigInt value kind, so none of its library
-        // surfaces either. Recorded as unsupported, and asserted as such, rather than skipped. The VM
-        // working tree has all three (B05-B08) and its next pin turns this row true.
-        ["broiler-vm"] = new(Value: false, TypedArrays: false, DataViewAccessors: false),
+        // The VM profile has BigInt from 0.1.0-preview.4 (B05-B08), host surface included (JSeal B06).
+        ["broiler-vm"] = new(Value: true, TypedArrays: true, DataViewAccessors: true),
     };
 
     /// <summary>One engine's row of <see cref="BigIntSurfaces"/>.</summary>
@@ -448,7 +446,7 @@ public partial class JsealConformanceTests
     }
 
     /// <summary>
-    /// Two handles for one guest object are equal, hash the same, and find one dictionary entry â€”
+    /// Two handles for one guest object are equal, hash the same, and find one dictionary entry —
     /// whichever route each of them arrived by.
     /// </summary>
     /// <remarks>
@@ -456,7 +454,7 @@ public partial class JsealConformanceTests
     /// <b>The contract already named this test, and nothing was asserting it.</b>
     /// <see cref="JsValue.ObjectIdentity"/>'s remarks say a provider that did not hand back one
     /// handle per guest object "would already be failing
-    /// <c>TwoHandlesForOneObjectAreEqualAndHashTheSame</c>" â€” and until this method existed that
+    /// <c>TwoHandlesForOneObjectAreEqualAndHashTheSame</c>" — and until this method existed that
     /// sentence was the only occurrence of the name in the repository. What it promises is what
     /// every retype in the bridge's migration lands on: a registry keyed on a handle finds its entry
     /// only if the handle the page hands back equals the handle the host put in.
@@ -465,7 +463,7 @@ public partial class JsealConformanceTests
     /// <b>The three routes are asserted separately because a provider can canonicalise on one and
     /// not on another.</b> <c>GetProperty</c> is the host reading its own object back; an evaluated
     /// expression is the engine handing one over; a call argument is how a listener actually
-    /// arrives â€” <c>Features/EventTargetBinding.cs</c> stores <c>call[1]</c> and
+    /// arrives — <c>Features/EventTargetBinding.cs</c> stores <c>call[1]</c> and
     /// <c>removeEventListener</c> then has to find it again. A provider that minted a fresh wrapper
     /// on the argument path alone would break every <c>removeEventListener</c> in the browser and
     /// still pass a test that only read properties back.
@@ -491,7 +489,7 @@ public partial class JsealConformanceTests
     /// <b>Every sameness claim below is guarded, because most of them pass on a handle that carries
     /// nothing.</b> <c>Missing == Missing</c> is <see langword="true"/>, two Missings hash alike
     /// (<see cref="JsValue.GetHashCode"/> answers the kind alone for them), and
-    /// <c>Missing.ObjectIdentity</c> is <see langword="null"/> â€” so a realm whose reads silently
+    /// <c>Missing.ObjectIdentity</c> is <see langword="null"/> — so a realm whose reads silently
     /// answered Missing satisfies an identity test written only in the positive direction. Each
     /// route opens on the kind and the identity of what came back, before it compares anything.
     /// </para>
@@ -538,7 +536,7 @@ public partial class JsealConformanceTests
 
             // Reset before the call rather than after it, so that a provider which never invoked the
             // host function is caught by the guard below instead of inheriting the previous kind's
-            // object â€” which would pass for two of the three kinds.
+            // object — which would pass for two of the three kinds.
             passed = JsValue.Missing;
             realm.EvaluateHostScript($"handOver({name})", $"test:identity-argument:{name}");
 

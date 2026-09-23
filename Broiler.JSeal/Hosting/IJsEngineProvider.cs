@@ -11,7 +11,7 @@
 public interface IJsEngineProvider
 {
     /// <summary>
-    /// A stable identifier, lower-case and hyphenated â€” <c>broiler-js</c>, <c>broiler-vm</c>. This is
+    /// A stable identifier, lower-case and hyphenated — <c>broiler-js</c>, <c>broiler-vm</c>. This is
     /// what a configuration or an environment variable names, so it does not change with a release.
     /// </summary>
     string Name { get; }
@@ -23,9 +23,9 @@ public interface IJsEngineProvider
     /// What realms from this provider will be able to do, before one is built.
     /// </summary>
     /// <remarks>
-    /// A realm's own <see cref="IJsRealm.Capabilities"/> may be <em>narrower</em> â€” a page whose
+    /// A realm's own <see cref="IJsRealm.Capabilities"/> may be <em>narrower</em> — a page whose
     /// Content-Security-Policy forbids evaluation gets a realm without
-    /// <see cref="JsCapabilities.GuestEval"/> from an engine that has it â€” but never wider. That is
+    /// <see cref="JsCapabilities.GuestEval"/> from an engine that has it — but never wider. That is
     /// what lets a host decide whether an engine can serve a page at all without paying to build a
     /// realm and find out.
     /// </remarks>
@@ -44,7 +44,7 @@ public interface IJsEngineProvider
 public sealed class JsRealmOptions
 {
     /// <summary>
-    /// Whether the page's <c>eval</c> and <c>new Function</c> may compile â€” <c>'unsafe-eval'</c>.
+    /// Whether the page's <c>eval</c> and <c>new Function</c> may compile — <c>'unsafe-eval'</c>.
     /// Default <see langword="true"/>; a host whose page's policy withholds <c>'unsafe-eval'</c>
     /// passes <see langword="false"/>, and the realm is built without
     /// <see cref="JsCapabilities.GuestEval"/>. The page's script elements and this repository's own

@@ -8,7 +8,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// </summary>
 /// <remarks>
 /// <b>Each reaches the same <c>JSContext.Eval</c>, and that is the point rather than a shortcut.</b>
-/// Broiler.JS carries a run-time compiler and cannot tell them apart â€” nothing in the engine
+/// Broiler.JS carries a run-time compiler and cannot tell them apart — nothing in the engine
 /// distinguishes them, because the distinction is not the engine's. It is the host's, and it is which
 /// directive governs the source rather than who wrote it. <see cref="EvaluateHostScript"/> runs
 /// source this repository authored and is exempt from the page's policy.
@@ -21,9 +21,9 @@ namespace Broiler.JSeal.BroilerJs;
 /// do not go through these members: <c>RefuseGuestCompilation</c> in <c>BroilerJsRealm.cs</c> refuses
 /// them inside the realm, on the event the engine raises before each one compiles. An engine with no
 /// run-time compiler would implement the members
-/// differently â€” compiling host script when it is built, and lacking both
+/// differently — compiling host script when it is built, and lacking both
 /// <see cref="JsCapabilities.ClassicScriptSource"/> and <see cref="JsCapabilities.GuestEval"/>,
-/// because a page's text is not knowable then â€” and the contract is shaped so that it can.
+/// because a page's text is not knowable then — and the contract is shaped so that it can.
 /// </remarks>
 internal partial class BroilerJsRealm
 {
@@ -107,10 +107,9 @@ internal partial class BroilerJsRealm
     /// counts. Line 0 means the parser had no position, such as end of input. The frame's line is not
     /// always the failure's: a lexer failure, such as an unterminated string, leaves it at the line
     /// where the token began scanning, so when the message ends in the parser's own
-    /// <c>at {line}, {column}</c> the two must agree. The pinned lexer also counts only LF and CRLF
-    /// as a line break, in code, comments, strings and templates alike, while ECMAScript also counts a
-    /// lone CR, U+2028 and U+2029. Text containing any of those reports no line rather than a
-    /// plausible wrong one.
+    /// <c>at {line}, {column}</c> the two must agree. Text in which the pinned lexer may count lines
+    /// differently from ECMAScript reports no line rather than a plausible wrong one; see
+    /// <see cref="HasMiscountedLines"/>.
     /// </remarks>
     private static int? CompileFailureLine(string message, string? trace, string sourceLabel, string source)
     {
@@ -145,8 +144,10 @@ internal partial class BroilerJsRealm
     }
 
     /// <summary>
-    /// Whether the text holds a line terminator the pinned lexer does not count as ECMAScript does:
-    /// a CR not followed by LF, U+2028 or U+2029, wherever it appears.
+    /// Whether the text holds a line terminator the pinned lexer may not count as ECMAScript does: a
+    /// CR not followed by LF, U+2028 or U+2029, wherever it appears, or a line terminator directly
+    /// after a backslash - a line continuation, which the pinned lexer does not count inside a string
+    /// or template. Telling a continuation from a comment needs a lexer, so any such pair counts.
     /// </summary>
     private static bool HasMiscountedLines(string source)
     {
@@ -157,6 +158,8 @@ internal partial class BroilerJsRealm
                 case '\u2028' or '\u2029':
                     return true;
                 case '\r' when i + 1 == source.Length || source[i + 1] != '\n':
+                    return true;
+                case '\\' when i + 1 < source.Length && source[i + 1] is '\n' or '\r' or '\u2028' or '\u2029':
                     return true;
             }
         }

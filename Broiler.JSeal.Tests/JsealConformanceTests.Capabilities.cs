@@ -17,7 +17,8 @@ namespace Broiler.JSeal.Tests;
 /// <see cref="IJsRealm.Capabilities"/> is that ability narrowed, never widened. The only narrowing a
 /// host can ask for is <see cref="JsRealmOptions.AllowGuestEval"/>; a provider may also withhold a
 /// flag from a realm that turns out to lack what the flag needs (the VM provider drops BinaryData
-/// and the three source flags when its bridge finds no binary intrinsics or no <c>eval</c>), which
+/// when its bridge finds no binary intrinsics, GuestEval when it finds no <c>eval</c>, and
+/// StructuredClone when the realm cannot clone), which
 /// <see cref="ADefaultRealmHasEveryCapabilityItsProviderDeclares"/> turns into a failure rather than
 /// a quiet narrowing. Theory rows are chosen by provider ability. A witness then asserts that a realm
 /// built with the permissions it asked for really has the capability, rather than returning early

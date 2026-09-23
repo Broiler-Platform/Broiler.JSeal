@@ -37,15 +37,15 @@ public enum JsTransferKind
 /// </para>
 /// <para>
 /// <b>Nothing may read it but the provider that made it.</b> The payload is deliberately not exposed
-/// on this type â€” <see cref="Providers.JsProviderClone"/> is the only way in and out, the way
-/// <see cref="Providers.JsProviderValue"/> is for a handle â€” because a host that could unwrap one
+/// on this type — <see cref="Providers.JsProviderClone"/> is the only way in and out, the way
+/// <see cref="Providers.JsProviderValue"/> is for a handle — because a host that could unwrap one
 /// would be holding one realm's object graph on another realm's thread, which is the race the second
 /// clone exists to prevent. What a host may do with it is carry it, and hand it to
 /// <see cref="IJsClone.Adopt"/>.
 /// </para>
 /// <para>
 /// <b>It is engine-scoped, not realm-scoped.</b> <see cref="EngineName"/> is carried so that
-/// <see cref="IJsClone.Adopt"/> can refuse a carrier another engine minted â€” a process with two
+/// <see cref="IJsClone.Adopt"/> can refuse a carrier another engine minted — a process with two
 /// engines linked will have both kinds in flight, and a graph from one is not a graph the other can
 /// walk. It names no realm because not belonging to one is the whole point.
 /// </para>
@@ -78,7 +78,7 @@ public sealed class JsDetachedValue
 /// <para>
 /// <b>Three operations rather than one, because a browser does three different things.</b>
 /// Same-document messaging (<c>window.postMessage</c>, a <c>MessagePort</c>) clones once, in one
-/// realm, and delivers the copy â€” that is <see cref="Clone"/>. A message crossing to a Worker is
+/// realm, and delivers the copy — that is <see cref="Clone"/>. A message crossing to a Worker is
 /// cloned <em>twice</em>, and the pair is the whole reason the crossing is safe: once on the sending
 /// thread into a graph no script can reach (<see cref="Detach"/>), and again on the receiving thread
 /// into the receiving realm (<see cref="Adopt"/>). Cloning once and handing the result over would put
@@ -97,8 +97,8 @@ public sealed class JsDetachedValue
 /// <para>
 /// <b>Which realm a clone is minted into is decided by which realm is asked.</b> That is why these are
 /// realm members rather than a free function taking two realms: on an engine that resolves intrinsics
-/// from ambient state â€” Broiler.JS reads a thread-static to decide whose <c>Object.prototype</c> a new
-/// object gets â€” a clone taken outside a realm call mints into whatever realm happened to be current,
+/// from ambient state — Broiler.JS reads a thread-static to decide whose <c>Object.prototype</c> a new
+/// object gets — a clone taken outside a realm call mints into whatever realm happened to be current,
 /// silently, on exactly the path where the two realms are supposed to stop touching. A provider
 /// enters its realm for the duration of a contract call; putting the clone on the contract is what
 /// brings it inside that bracket.
@@ -151,7 +151,7 @@ public interface IJsClone
     JsDetachedValue Detach(JsValue value, ReadOnlySpan<JsValue> transfer = default);
 
     /// <summary>
-    /// Materialises <paramref name="detached"/> into this realm â€” the second of the two clones.
+    /// Materialises <paramref name="detached"/> into this realm — the second of the two clones.
     /// </summary>
     /// <remarks>
     /// Called on the <em>receiving</em> thread, so the objects it mints are the receiving realm's own

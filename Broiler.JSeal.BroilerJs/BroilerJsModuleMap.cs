@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
+using Broiler.JavaScript.Modules;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JSeal.BroilerJs;
@@ -12,25 +13,18 @@ namespace Broiler.JSeal.BroilerJs;
 /// <para>
 /// <b>What the map does and what the engine does.</b> The map resolves every specifier through the
 /// host, loads each key once, compiles each text as a module before anything runs (so a parse error
-/// is a load failure), reads each module's static requests, and refuses the graphs the pinned engine
-/// would run wrongly (see <see cref="BroilerJsModuleAnalysis"/>). Evaluation, the exports objects and
-/// the binding of imported names are the engine's: <see cref="BroilerJsModuleContext"/> only answers
-/// which already-loaded module a request names.
+/// is a load failure), reads each module's static requests, and refuses a module that calls
+/// <c>import()</c> (see <see cref="BroilerJsModuleAnalysis"/>). Everything ECMAScript calls linking
+/// and evaluation is the engine's: Broiler.JS 0.1.0-preview.3 links the graph (a missing or ambiguous
+/// export is its SyntaxError), binds imports live, gives each module its own strict scope, handles
+/// cycles and top-level await, and caches evaluation errors. <see cref="BroilerJsModuleContext"/>
+/// only answers which already-loaded module a request names, from what the host said.
 /// </para>
 /// <para>
-/// <b>Module code is compiled strict.</b> The pinned engine compiles module text as the sloppy body
-/// of a function, and has no strictness option, so the map prepends <c>"use strict";</c> to the text
-/// it hands the engine, after a hashbang line if there is one, which is how this provider already
-/// forces strictness on host source. Line numbers are unchanged; engine-reported columns on the
-/// directive's line shift by its 13 characters.
-/// </para>
-/// <para>
-/// <b>Top-level var and function declarations are global properties on the pinned engine.</b> Two
-/// modules declaring the same such name would share one binding, and a module reading a name it does
-/// not declare would see another module's. Link refuses a graph in which a fresh module's
-/// <see cref="BroilerJsModuleAnalysis.TopLevelVarNames"/> meet another module's, or another module's
-/// <see cref="BroilerJsModuleAnalysis.FreeNames"/>, or a property the global object already has. That
-/// the names are visible as properties of <c>globalThis</c> at all is a reported gap, not refusable.
+/// <b>The engine links when an evaluation starts, not when the map links.</b> The map's Link phase
+/// makes a loaded graph visible; the engine loads and links it from the map's records when
+/// <see cref="Record.Evaluate"/> first starts it, so a link error surfaces as that evaluation's
+/// rejection rather than as a <see cref="LoadAsync"/> failure.
 /// </para>
 /// <para>
 /// <b>Everything here runs on the realm's thread.</b> Host loads complete wherever the host completes
@@ -48,9 +42,6 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
     private readonly Dictionary<(string Referrer, string Specifier), JsModuleKey> _resolutions = [];
     private readonly HashSet<GraphLoad> _graphs = [];
 
-    // Linked modules' top-level var-scoped names and free names, for the global-binding refusal in Link.
-    private readonly Dictionary<string, Record> _topLevelVarOwners = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, Record> _freeNameReaders = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _cancellation = new();
     private int _fetching;
     private bool _disposed;
@@ -163,6 +154,22 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
     /// <summary>The loaded text of a module, by the internal name the engine knows it by.</summary>
     internal string? SourceFor(string internalName) =>
         _byInternalName.TryGetValue(internalName, out var record) ? record.Source : null;
+
+    /// <summary>
+    /// What the engine's loader resolves a request to: a linked root by its internal name, and a
+    /// module's static request by the record the host resolved it to when the graph was loaded.
+    /// </summary>
+    internal string? ResolveForEngine(string? referrerName, string specifier)
+    {
+        if (referrerName is null)
+            return _byInternalName.TryGetValue(specifier, out var root) && root.Linked ? specifier : null;
+
+        return _byInternalName.TryGetValue(referrerName, out var referrer)
+            && referrer.Requested.TryGetValue(specifier, out var dependency)
+            && dependency.Linked
+                ? dependency.InternalName
+                : null;
+    }
 
     // ── resolution and loading ──────────────────────────────────────────────────────────────────
 
@@ -326,9 +333,8 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             var source = completed.Result;
             label = string.IsNullOrEmpty(source.Label) ? record.Key.Value : source.Label;
             var internalName = InternalNameFor(label);
-            var strictText = StrictModuleText(source.Text!);
 
-            if (_realm.CompileModule(strictText, internalName, label) is { } syntaxError)
+            if (_realm.CompileModule(source.Text!, internalName, label) is { } syntaxError)
             {
                 phase = JsModulePhase.Parse;
                 failure = $"'{label}' is not a valid module: {syntaxError.Message}";
@@ -339,9 +345,8 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             {
                 try
                 {
-                    // Analyzed as the host wrote it, so the directive is not a statement before its imports.
                     record.Analysis = BroilerJsModuleAnalysis.Analyze(source.Text!);
-                    record.Source = strictText;
+                    record.Source = source.Text;
                     record.Label = label;
                     record.InternalName = internalName;
                     _byInternalName[internalName] = record;
@@ -367,24 +372,6 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
 
         foreach (var graph in waiting)
             OnFetched(graph, record);
-    }
-
-    /// <summary>
-    /// The text the engine compiles: the host's, with a <c>"use strict";</c> directive on its first
-    /// line, or on the line after a hashbang, which must stay first. See the class remarks.
-    /// </summary>
-    internal static string StrictModuleText(string text)
-    {
-        const string Directive = "\"use strict\";";
-        if (!text.StartsWith("#!", StringComparison.Ordinal))
-            return Directive + text;
-
-        var end = text.IndexOfAny(['\n', '\r', '\u2028', '\u2029']);
-        if (end < 0)
-            return text + "\n" + Directive;
-
-        end += text[end] == '\r' && end + 1 < text.Length && text[end + 1] == '\n' ? 2 : 1;
-        return text[..end] + Directive + text[end..];
     }
 
     /// <summary>A name for the engine unique in this map, never one of its built-in module names.</summary>
@@ -426,8 +413,8 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
     }
 
     /// <summary>
-    /// Checks the loaded graph and makes it visible. The engine links nothing ahead of evaluation, so
-    /// this is where the graphs it would run wrongly are refused; see <see cref="BroilerJsModuleAnalysis"/>.
+    /// Checks the loaded graph against the map's options and the adapter's one refusal, and makes it
+    /// visible. The engine's own linking happens when an evaluation of the graph starts.
     /// </summary>
     private void Link(GraphLoad graph)
     {
@@ -442,143 +429,29 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             return;
         }
 
-        if (FindCycle(fresh) is { } cycle)
-        {
-            graph.Fail(graph.Failure(cycle[0], JsModulePhase.Link,
-                $"The module graph is cyclic ({string.Join(" -> ", cycle.Select(record => record.Label))}), and Broiler.JS " +
-                "0.1.0-preview.1 has neither live bindings nor a cross-module temporal dead zone, so a cycle would read " +
-                "copies taken before the other module ran. Refused until the upstream Broiler.JS module-semantics slice lands.",
-                cycle[0].Label));
-            return;
-        }
-
         foreach (var record in fresh)
         {
             if (record.Analysis!.Refusal is { } reason)
             {
-                graph.Fail(graph.Failure(record, JsModulePhase.Link,
-                    $"'{record.Label}' is refused: {reason}. Refused until the upstream Broiler.JS module-semantics slice lands.",
-                    record.Label));
+                graph.Fail(graph.Failure(record, JsModulePhase.Link, $"'{record.Label}' is refused: {reason}.", record.Label));
                 return;
-            }
-
-            if (SharedGlobalBinding(record, fresh) is { } shared)
-            {
-                graph.Fail(graph.Failure(record, JsModulePhase.Link,
-                    $"'{record.Label}' is refused: {shared}, and Broiler.JS 0.1.0-preview.1 binds a module's top-level var and " +
-                    "function declarations on the realm's global object, so they would share one binding. Refused until the " +
-                    "upstream Broiler.JS module-semantics slice lands.",
-                    record.Label));
-                return;
-            }
-
-            // The engine awaits each dependency where its import declaration stands, so an importer
-            // waits for an asynchronous dependency before it even starts the next one. ECMAScript starts
-            // the later siblings while the first waits. Only the last request may be asynchronous.
-            var requests = record.Analysis.Requests;
-            for (var i = 0; i < requests.Count - 1; i++)
-            {
-                var dependency = record.Requested[requests[i].Specifier];
-                if (IsAsyncGraph(dependency, []))
-                {
-                    graph.Fail(graph.Failure(record, JsModulePhase.Link,
-                        $"'{record.Label}' imports '{dependency.Label}', which waits on top-level await, before another " +
-                        "module, and Broiler.JS 0.1.0-preview.1 would not start that module until the wait ends. Refused " +
-                        "until the upstream Broiler.JS module-semantics slice lands.",
-                        record.Label));
-                    return;
-                }
             }
         }
 
         foreach (var record in fresh)
-        {
             record.Linked = true;
-            foreach (var name in record.Analysis!.TopLevelVarNames)
-                _topLevelVarOwners.TryAdd(name, record);
-            foreach (var name in record.Analysis.FreeNames)
-                _freeNameReaders.TryAdd(name, record);
-        }
 
         graph.Complete();
     }
 
-    /// <summary>
-    /// Why <paramref name="record"/>'s top-level var-scoped names would meet another module's names,
-    /// or the global object's, on the pinned engine's global object; or null.
-    /// </summary>
-    private string? SharedGlobalBinding(Record record, List<Record> fresh)
-    {
-        var analysis = record.Analysis!;
-        foreach (var name in analysis.TopLevelVarNames)
-        {
-            var owner = _topLevelVarOwners.GetValueOrDefault(name)
-                ?? fresh.FirstOrDefault(other => other != record && other.Analysis!.TopLevelVarNames.Contains(name));
-            if (owner is not null)
-                return $"it declares the top-level var or function '{name}', which '{owner.Label}' also declares";
-
-            var reader = _freeNameReaders.GetValueOrDefault(name)
-                ?? fresh.FirstOrDefault(other => other != record && other.Analysis!.FreeNames.Contains(name));
-            if (reader is not null)
-                return $"it declares the top-level var or function '{name}', which '{reader.Label}' reads without declaring it";
-
-            if (_realm.HasProperty(_realm.Global, name))
-                return $"it declares the top-level var or function '{name}', which the realm's global object already has";
-        }
-
-        foreach (var name in analysis.FreeNames)
-        {
-            if (_topLevelVarOwners.TryGetValue(name, out var owner))
-                return $"it reads '{name}' without declaring it, and '{owner.Label}' declares it as a top-level var or function";
-        }
-
-        return null;
-    }
-
-    /// <summary>Whether <paramref name="record"/> or anything it imports uses top-level await. The graph is acyclic here.</summary>
-    private static bool IsAsyncGraph(Record record, HashSet<Record> visited) =>
-        visited.Add(record)
-        && (record.Analysis!.HasTopLevelAwait || record.Requested.Values.Any(dependency => IsAsyncGraph(dependency, visited)));
-
-    /// <summary>A cycle among <paramref name="records"/>, as a path that starts and ends at the same record, or null.</summary>
-    private static List<Record>? FindCycle(List<Record> records)
-    {
-        var state = new Dictionary<Record, bool>(); // false: on the stack, true: done
-        var path = new List<Record>();
-
-        foreach (var record in records)
-        {
-            if (Visit(record) is { } cycle)
-                return cycle;
-        }
-
-        return null;
-
-        List<Record>? Visit(Record record)
-        {
-            if (record.Linked)
-                return null;
-
-            if (state.TryGetValue(record, out var done))
-                return done ? null : [.. path.Skip(path.IndexOf(record)), record];
-
-            state[record] = false;
-            path.Add(record);
-            foreach (var dependency in record.Requested.Values)
-            {
-                if (Visit(dependency) is { } cycle)
-                    return cycle;
-            }
-
-            path.RemoveAt(path.Count - 1);
-            state[record] = true;
-            return null;
-        }
-    }
-
     // ── evaluation ──────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>What the engine's loader calls for each <c>import</c> a module body reaches.</summary>
+    /// <summary>
+    /// What <c>JSModuleContext.LoadModuleAsync</c> is asked for by anything other than
+    /// <see cref="BroilerJsModuleContext.LoadThroughEngine"/>: a module's static requests, answered
+    /// with the evaluation of the record the host resolved. The engine's own graph walk does not come
+    /// here; it resolves through <see cref="ResolveForEngine"/>.
+    /// </summary>
     internal Task<JSValue> ImportForEngine(string? referrerName, string specifier)
     {
         if (IsUnusable)
@@ -589,7 +462,7 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             || !referrer.Requested.TryGetValue(specifier, out var dependency))
         {
             return Task.FromException<JSValue>(_realm.ModuleTypeError(
-                $"'{specifier}' is not a static import of this module; import() is not routed through the module contract on the pinned Broiler.JS engine"));
+                $"'{specifier}' is not a static import of this module; import() is not routed through the module contract by the Broiler.JS adapter"));
         }
 
         return StartEvaluation(dependency);
@@ -600,17 +473,18 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
     /// importer afterwards, including one that arrives while it is still running or after it failed.
     /// </summary>
     /// <remarks>
-    /// Shared rather than re-requested from the engine because the engine answers a second request
-    /// for a module it has started with that module's exports as they stand, whether or not its body
-    /// has finished or thrown. Every caller is entered and on this realm's scheduler.
+    /// Shared rather than re-requested from the engine so that the record's status and settlement have
+    /// one source. The engine itself caches a module's evaluation and its error, so a later request -
+    /// such as <see cref="JoinEngineOutcomes"/> makes for a dependency - answers with that outcome.
+    /// Every caller is entered and on this realm's scheduler.
     /// </remarks>
     internal Task<JSValue> StartEvaluation(Record record)
     {
         if (record.EvaluationTask is { } started)
             return started;
 
-        // Only a cycle could import a module while its own evaluation is starting, and cycles are
-        // refused at link time; a second engine request here would read unfinished exports.
+        // The engine defers the start of a requested evaluation to a job, so nothing can ask for this
+        // record again while the request is being made; refused rather than started twice if it does.
         if (record.Starting)
         {
             return Task.FromException<JSValue>(_realm.ModuleTypeError(
@@ -641,6 +515,28 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             TaskScheduler.Default);
 
         return task;
+    }
+
+    /// <summary>
+    /// Joins the outcome of every module the engine evaluated as part of another module's graph.
+    /// </summary>
+    /// <remarks>
+    /// The engine evaluates a whole graph from its root, so a dependency's own record is told nothing.
+    /// A second request for a module the engine has evaluated answers with its cached outcome - its
+    /// evaluation error included - so each such record starts its own (joined) evaluation here, and
+    /// settles through the job queue like any other. A module the walk never reached stays linked.
+    /// Runs as a job, after a record finished.
+    /// </remarks>
+    private void JoinEngineOutcomes()
+    {
+        foreach (var record in _records.Values)
+        {
+            if (record is { Linked: true, EvaluationTask: null, InternalName: { } name }
+                && _realm.EngineModule(name) is { Status: ModuleStatus.Evaluated })
+            {
+                _realm.InModuleTurn(() => StartEvaluation(record));
+            }
+        }
     }
 
     // ── records ─────────────────────────────────────────────────────────────────────────────────
@@ -679,6 +575,19 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             get
             {
                 map.ThrowIfUnusable();
+
+                // Evaluated by the engine as part of another module's graph, and not joined yet.
+                if (EvaluationTask is null && InternalName is { } name)
+                {
+                    switch (map._realm.EngineModule(name)?.Status)
+                    {
+                        case ModuleStatus.Evaluating:
+                            return JsModuleStatus.Evaluating;
+                        case ModuleStatus.EvaluatingAsync:
+                            return JsModuleStatus.EvaluatingAsync;
+                    }
+                }
+
                 return _status;
             }
 
@@ -723,16 +632,10 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
             if (_namespace is { } known)
                 return known;
 
-            if (EvaluationTask is null)
-            {
-                throw new InvalidOperationException(
-                    $"'{SourceLabel}' has not started evaluating, and Broiler.JS 0.1.0-preview.1 creates a module's " +
-                    "namespace only when its evaluation starts. Call Evaluate first; the upstream Broiler.JS " +
-                    "module-semantics slice removes this limitation.");
-            }
-
             _namespace = map._realm.EngineNamespace(InternalName!)
-                ?? throw new InvalidOperationException($"The engine has no module compiled as '{InternalName}'.");
+                ?? throw new InvalidOperationException(
+                    $"'{SourceLabel}' has not been linked by the engine, and Broiler.JS links a module only when an " +
+                    "evaluation of its graph starts. Call Evaluate on it, or on a module that imports it, first.");
             return _namespace.Value;
         }
 
@@ -755,6 +658,8 @@ internal sealed class BroilerJsModuleMap : IJsModuleMap
 
             if (!_promise.IsMissing)
                 Settle();
+
+            map.JoinEngineOutcomes();
         }
 
         private void Settle()

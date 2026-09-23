@@ -1,9 +1,10 @@
 # Host and cross-repository integration slices
 
-[Roadmap index](roadmap.md). I09 is **complete**. The VM halves of I01, I03, I05, I07, I11 and I12,
-and I14-I17, are implemented in the Broiler.VM working tree. JSeal's adoption of them (I02, I04,
-I06, I08, I11, I12's VM routing and I18's VM clone) is prepared and validated against a local VM
-candidate and waits for a VM release. I10, I12 and I18 are **partial**; I13 is not started. These slices concern the host surface
+[Roadmap index](roadmap.md). I09 and I11 are **complete**. The VM halves of I01, I03, I05, I07,
+I11 and I12, and I14-I17, are released in Broiler.VM `0.1.0-preview.4`, pinned since 2026-09-23.
+JSeal has adopted I11, I12's VM routing and I18's VM clone against that release; I02, I04, I06 and
+I08 are still prepared only against a local candidate. I10, I12 and I18 are **partial**; I13 is not
+started. These slices concern the host surface
 and JSeal contracts; missing adapter behavior does not imply the VM lacks the underlying language
 feature. Native host API additions map primarily to VM JSP-10; modules to JSW-8; job integration
 to JSW-7. Structured clone needs explicit owning milestones in the VM ledger when scheduled.
@@ -210,8 +211,13 @@ unavailable API reference with an unrelated adapter fix.
 
 ## I11 — Implement the VM module adapter over existing graph support
 
-- **Status:** Implemented against a local VM candidate; waits for a VM release. Upstream, the
-  Broiler.VM working tree has `JsHostRealm.LoadModule`/`EvaluateModule` (JSD-0024 section 15), an
+- **Status:** Complete on 2026-09-23, against the released Broiler.VM `0.1.0-preview.4`: the
+  adapter below was re-created from the prepared patch against that package, and **all 47
+  provider-neutral module cases pass on broiler-vm with no gap row**, alongside
+  `VmModuleAdapterTests` for the gate, `MaxModules`, host re-entry and a realm without the
+  contract. It stays behind the internal `VmEngineProvider.EnableModuleContract` gate, and no
+  capability is declared, pending I13. The history follows. Upstream, the Broiler.VM working tree
+  had `JsHostRealm.LoadModule`/`EvaluateModule` (JSD-0024 section 15), an
   evaluation walk that follows the pinned algorithm including concurrent async siblings and
   [[AsyncEvaluationOrder]] settlement, and `JsHostRealm.TryGetModuleState` ([[Status]], the
   identical [[EvaluationError]], [[HasTLA]] and [[CycleRoot]], section 20.1). In JSeal,
@@ -245,8 +251,11 @@ unavailable API reference with an unrelated adapter fix.
 
 ## I12 — Route dynamic import through the module contract
 
-- **Status:** Implemented for the VM against a local VM candidate; waits for a VM release. The VM
-  seam is `IJsHostModuleLoader` with deferred `CompleteModuleRequest`/`FailModuleRequest`, and the
+- **Status:** Implemented for the VM against the released `0.1.0-preview.4` (2026-09-23): the
+  eleven shared dynamic-import cases pass on broiler-vm. The Broiler.JS adapter still refuses a
+  module that calls `import()` on `0.1.0-preview.3`, whose engine resolves the specifier through a
+  synchronous `Resolve` at run time that the adapter cannot answer from the host; those rows stay
+  gaps. The history follows. The VM seam is `IJsHostModuleLoader` with deferred `CompleteModuleRequest`/`FailModuleRequest`, and the
   adoption routes `import()` through the map with the calling module's key or the calling script's
   label. Since the VM carries GetActiveScriptOrModule()'s referrer into eval code, `Function` bodies
   and code a job runs (JSD-0024 section 20.3), **the adapter needed no change and its recorded
@@ -258,8 +267,7 @@ unavailable API reference with an unrelated adapter fix.
   case: HostEnqueuePromiseJob asks an implementation to make the enqueuing script or module active
   again, which Broiler.VM does and Node does not, while the pinned Broiler.JS engine carries no
   referrer across a job at all; the question is recorded for I13. The Broiler.JS side stays refused
-  on the pinned package (all eleven cases are gap rows); the upstream Broiler.JS module work (see
-  I10) is unreleased.
+  on the pinned package (all eleven cases are gap rows).
 - **Owner / prerequisites:** Both JSeal providers and any upstream host seams; I10-I11.
 - **Work:** Route import() through host resolution using the calling module's identity and the
   defined job queue. Cache module identity consistently with static imports. Define failure and
@@ -364,10 +372,12 @@ unavailable API reference with an unrelated adapter fix.
 
 ## I18 — Expose VM cloning through JSeal and enable the earned capability
 
-- **Status:** Partial. A public `StructuredClone` capability flag (a new bit; existing values
-  unchanged) separates same-realm cloning from WorkerRealms, as J18 decided; it is merged and
+- **Status:** Partial; WorkerRealms remains. A public `StructuredClone` capability flag (a new bit;
+  existing values unchanged) separates same-realm cloning from WorkerRealms, as J18 decided; it is
   declared for broiler-js, whose pinned engine's deviations from HTML StructuredSerialize are
-  recorded as gaps in [the guide](jseal.md). The prepared VM adoption implements `Clone`, `Detach`,
+  recorded as gaps in [the guide](jseal.md), and **for broiler-vm since 2026-09-23**, against the
+  released `0.1.0-preview.4`: every shared clone case passes on it, and a realm declares the flag only
+  after it cloned a value at handover. The history follows. The prepared VM adoption implements `Clone`, `Detach`,
   `Adopt` and `ClassifyTransferable` over `DetachClone`/`AdoptClone` (JSD-0024 section 17, carrier
   layout 2 with BigInt). The adoption lives in `jseal-vm-next3-over-normal.patch` (placeholder pin
   VM `0.1.0-preview.4`); it passed both configurations and the J19 candidate lane against local

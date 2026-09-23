@@ -15,16 +15,16 @@ namespace Broiler.JSeal.BroilerJs;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The class is split by capability, one file per interface</b> â€” <c>.Values</c>, <c>.Members</c>,
-/// <c>.Calls</c>, <c>.Jobs</c>, <c>.Source</c> â€” for the reason <c>IJsRealmCapabilities.cs</c> gives
+/// <b>The class is split by capability, one file per interface</b> — <c>.Values</c>, <c>.Members</c>,
+/// <c>.Calls</c>, <c>.Jobs</c>, <c>.Source</c> — for the reason <c>IJsRealmCapabilities.cs</c> gives
 /// for splitting the contract: a reader asking what this engine must do to serve a DOM gets five
 /// answerable questions rather than one surface of forty members. This file carries what all five
 /// share: the context, the ambient-realm scope they enter, and the trampoline.
 /// </para>
 /// <para>
 /// <b>Every public member enters the realm before touching the engine.</b> Broiler.JS resolves a
-/// realm's intrinsics from a thread-static â€” <c>new JSObject()</c> reads the current context's
-/// <c>Object.prototype</c>, <c>new JSFunction(â€¦)</c> reads its <c>Function.prototype</c> â€” so an
+/// realm's intrinsics from a thread-static — <c>new JSObject()</c> reads the current context's
+/// <c>Object.prototype</c>, <c>new JSFunction(…)</c> reads its <c>Function.prototype</c> — so an
 /// operation performed with no context current mints an object with a null prototype and no error.
 /// That is precisely the ambient-state hazard <c>JsCall</c> keeps off the contract by putting the
 /// realm on the call; it does not go away underneath, so the provider is where it is paid for, once
@@ -56,7 +56,7 @@ internal partial class BroilerJsRealm : IJsRealm
         // The pump has to exist before the context does: JSContext captures the synchronization
         // context it was handed (or the thread's) in its constructor, and a promise created later
         // captures whatever the context captured. Building the context first and installing a pump
-        // afterwards would leave every promise made in between reporting to the thread pool â€” which
+        // afterwards would leave every promise made in between reporting to the thread pool — which
         // is the defect MicroTaskSynchronizationContext was written to fix, reintroduced one layer
         // down.
         _jobs = new JobQueue();
@@ -141,8 +141,8 @@ internal partial class BroilerJsRealm : IJsRealm
     /// <b>An adopted realm's job queue sees only what the host puts in it.</b> A realm this provider
     /// created hands its pump to the <c>JSContext</c> constructor, so every promise made in it
     /// captures that pump and its reactions land where <see cref="DrainJobs"/> can run them. A context
-    /// built elsewhere captured whatever was current when <em>it</em> was constructed â€” in this
-    /// repository, <c>ScriptEngine</c>'s <c>MicroTaskSynchronizationContext</c> â€” and that cannot be
+    /// built elsewhere captured whatever was current when <em>it</em> was constructed — in this
+    /// repository, <c>ScriptEngine</c>'s <c>MicroTaskSynchronizationContext</c> — and that cannot be
     /// changed afterwards. So <see cref="EnqueueJob"/> and <see cref="DrainJobs"/> work, and are the
     /// only jobs this realm knows about; the engine-scheduled reactions stay with the host's own
     /// queue, which is the one already draining them. Two queues is the correct count while the
@@ -210,6 +210,13 @@ internal partial class BroilerJsRealm : IJsRealm
     /// <summary>The source of a module this realm's map loaded, by internal name, or null.</summary>
     internal string? ModuleSourceFor(string internalName) => _moduleMap?.SourceFor(internalName);
 
+    /// <summary>
+    /// The internal name a request resolves to: a root by its own internal name, or a module's static
+    /// request by the answer the host gave when the graph was loaded. Null for anything else.
+    /// </summary>
+    internal string? ResolveModuleForEngine(string? referrerName, string specifier) =>
+        _moduleMap?.ResolveForEngine(referrerName, specifier);
+
     /// <summary>The engine's realm, for the provider's own files.</summary>
     internal JSContext Context => _context;
 
@@ -233,7 +240,7 @@ internal partial class BroilerJsRealm : IJsRealm
         if (!_allowGuestEval)
             _context.EvalEvent -= RefuseGuestCompilation;
 
-        // An adopted context belongs to the host that built it, and that host disposes it â€” in this
+        // An adopted context belongs to the host that built it, and that host disposes it — in this
         // repository, InteractiveSession, which tears the bridge down first and then disposes the
         // context. Disposing it from here would tear it down underneath whatever is still using it.
         if (_ownsContext)
@@ -245,10 +252,10 @@ internal partial class BroilerJsRealm : IJsRealm
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
-    // â”€â”€ the ambient realm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── the ambient realm ───────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Makes this realm â€” and its job pump â€” current on the calling thread until the returned scope
+    /// Makes this realm — and its job pump — current on the calling thread until the returned scope
     /// is disposed. See the remarks on the class for why every entry point needs it.
     /// </summary>
     /// <remarks>
@@ -258,7 +265,7 @@ internal partial class BroilerJsRealm : IJsRealm
     /// (<c>JSContext.PostJob</c>, case 1), ahead of the context's own microtask queue. For a realm
     /// this provider built that is exactly right: the pump is the one the <c>JSContext</c> was
     /// constructed with, and <see cref="DrainJobs"/> is what empties it. For an <em>adopted</em>
-    /// context it is exactly wrong â€” the host built that context with its own scheduling
+    /// context it is exactly wrong — the host built that context with its own scheduling
     /// (<c>MicroTaskSynchronizationContext</c> here) and drains that queue, so installing this pump
     /// over it for the duration of every contract call diverted any reaction created inside a JSEAL
     /// call into a queue nothing in the process empties. A page whose event listener resolved a
@@ -291,7 +298,7 @@ internal partial class BroilerJsRealm : IJsRealm
 
         /// <param name="pump">
         /// The job pump to make current, or <see langword="null"/> to leave the thread's own
-        /// synchronization context in place â€” see the remarks on <see cref="Enter"/>.
+        /// synchronization context in place — see the remarks on <see cref="Enter"/>.
         /// </param>
         internal RealmScope(JSContext context, SynchronizationContext? pump)
         {
@@ -316,12 +323,12 @@ internal partial class BroilerJsRealm : IJsRealm
         }
     }
 
-    // â”€â”€ the trampoline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── the trampoline ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// How many arguments a call carries before the trampoline has to reach for the heap. Eight
-    /// covers every operation the DOM bridge installs â€” the widest WebIDL operation it binds takes
-    /// six â€” and doubles Broiler.JS's own four inline <c>Arguments</c> slots, so an argument list the
+    /// covers every operation the DOM bridge installs — the widest WebIDL operation it binds takes
+    /// six — and doubles Broiler.JS's own four inline <c>Arguments</c> slots, so an argument list the
     /// engine already spilled to an array is not spilled twice.
     /// </summary>
     private const int InlineArgumentCapacity = 8;
@@ -350,7 +357,7 @@ internal partial class BroilerJsRealm : IJsRealm
     /// <b>Nothing is allocated on the common path.</b> The argument handles are copied into an inline
     /// buffer in this frame and handed on as a span of it, which is the shape <c>JsCall</c> was
     /// declared a <see langword="ref"/> struct to permit. A call with more arguments than the buffer
-    /// holds rents an array rather than allocating one, and clears it before returning it â€” a
+    /// holds rents an array rather than allocating one, and clears it before returning it — a
     /// <see cref="JsValue"/> can hold a reference to a DOM wrapper, and a pooled array is exactly the
     /// kind of long-lived root that would keep a document alive after the page that owned it went
     /// away.
@@ -362,7 +369,7 @@ internal partial class BroilerJsRealm : IJsRealm
     /// have been the shorter spelling and would have coerced the distinction away.
     /// </para>
     /// <para>
-    /// <b>Nothing is caught.</b> A host body that throws â€” a WebIDL TypeError, a DOMException, a bug â€”
+    /// <b>Nothing is caught.</b> A host body that throws — a WebIDL TypeError, a DOMException, a bug —
     /// must propagate into the engine so it becomes a JavaScript exception the page can catch, as
     /// it did from the <c>DomFunction</c> this replaced. A <see langword="catch"/> here would
     /// turn every one of those into a returned <c>undefined</c>, silently.
@@ -376,8 +383,8 @@ internal partial class BroilerJsRealm : IJsRealm
         // be read in order. JSEngine.NewTarget resolves the interpreter's frame stack, which is the
         // right answer for a constructor written in JavaScript; a host constructor's body runs as a
         // CLR delegate and pushes no frame, so that read is null and only the execution context's
-        // CurrentNewTarget â€” set by [[Construct]] immediately before it invokes the delegate
-        // (JSFunction.cs:860) â€” has the value; ObjectClassFactory.cs:40 reads just that. The engine's
+        // CurrentNewTarget — set by [[Construct]] immediately before it invokes the delegate
+        // (JSFunction.cs:860) — has the value; ObjectClassFactory.cs:40 reads just that. The engine's
         // NewTargetPrototype reads both in the same order (EngineAssemblyInitializer.cs:70-71).
         //
         // Reading only the first is what made JsCall.NewTarget always Missing in a host constructor,
@@ -427,7 +434,7 @@ internal partial class BroilerJsRealm : IJsRealm
     /// <remarks>
     /// A class with an instance method rather than a lambda closing over the realm: the delegate is
     /// built once per host function and is then held for the life of the wrapper, so what matters is
-    /// that the shape is explicit â€” a reader can see that the realm, the body and the call kind are
+    /// that the shape is explicit — a reader can see that the realm, the body and the call kind are
     /// the whole of what a trampoline captures, which a compiler-generated closure would not say.
     /// </remarks>
     private sealed class CallSite(BroilerJsRealm realm, JsNativeFunction body, bool construct)

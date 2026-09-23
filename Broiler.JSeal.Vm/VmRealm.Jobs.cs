@@ -5,7 +5,7 @@ namespace Broiler.JSeal.Vm;
 /// <summary>
 /// <see cref="IJsJobs"/>: the microtask queue, and a promise this engine can hand a host.
 /// </summary>
-internal sealed partial class VmRealm
+internal partial class VmRealm
 {
     /// <inheritdoc />
     public bool HasPendingJobs => InStep(realm => realm.HasPendingJobs);
@@ -98,14 +98,14 @@ internal sealed partial class VmRealm
     /// <para>
     /// <b>It goes through <see cref="InStep{T}"/> like every other crossing, and that is what makes
     /// a settle from outside the guest legal at all.</b> A host settles a promise at the moment its
-    /// own work finished â€” a response arrived, a custom element was defined â€” which is almost never
+    /// own work finished — a response arrived, a custom element was defined — which is almost never
     /// while guest code is on the stack. The turn that opens for it is an invocation the embedder
     /// pays for.
     /// </para>
     /// <para>
     /// <b>It inherits <see cref="InStep{T}"/>'s thread rule and does not widen it.</b> The VM realm
     /// is current only inside a step AND on the thread that opened it, so a settle from a pool
-    /// thread asks the instance for a turn from that thread â€” which is the same thing every other
+    /// thread asks the instance for a turn from that thread — which is the same thing every other
     /// member of this provider does, and is a question about the instance rather than about
     /// promises. A host that completes work on the pool should post the settle to the thread it
     /// drives the realm from, as it must for any other crossing.

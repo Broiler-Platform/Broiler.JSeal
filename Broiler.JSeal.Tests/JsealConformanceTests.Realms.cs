@@ -10,7 +10,7 @@ namespace Broiler.JSeal.Tests;
 /// </summary>
 public partial class JsealConformanceTests
 {
-    // â”€â”€ re-entrancy and worker realms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── re-entrancy and worker realms ──────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(EnginesDeclaring), JsCapabilities.ReentrantHostCalls | JsCapabilities.HostScriptSource)]
@@ -47,8 +47,8 @@ public partial class JsealConformanceTests
 
         AssertHas(first, JsCapabilities.WorkerRealms | JsCapabilities.HostScriptSource);
 
-        // Nothing promises that two threads may touch ONE realm â€” the contract says so and this
-        // provider does not permit it â€” so the second realm is built and used entirely on the
+        // Nothing promises that two threads may touch ONE realm — the contract says so and this
+        // provider does not permit it — so the second realm is built and used entirely on the
         // second thread, which is what a Worker does.
         //
         // The capability names two things ("a second realm can be created on another thread AND
@@ -74,7 +74,7 @@ public partial class JsealConformanceTests
                 answer = second.ToJsString(second.GetProperty(second.Global, "inWorker"));
                 secondGlobal = second.Global;
 
-                // Adopted HERE, on this thread, by THIS realm â€” which is what makes the resulting
+                // Adopted HERE, on this thread, by THIS realm — which is what makes the resulting
                 // objects the worker's own rather than the page's.
                 var inbound = second.Adopt(sent);
                 received = second.ToJsString(second.GetProperty(inbound, "greeting"));
@@ -105,7 +105,7 @@ public partial class JsealConformanceTests
         Assert.Equal("from the worker", first.ToJsString(first.GetProperty(materialized, "greeting")));
     }
 
-    // â”€â”€ structured clone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── structured clone ───────────────────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(EnginesDeclaring), JsCapabilities.StructuredClone)]
@@ -233,7 +233,7 @@ public partial class JsealConformanceTests
         Assert.Throws<JsEngineException>(() => realm.Adopt(foreign));
     }
 
-    // â”€â”€ the two array questions the messaging transfer-list walk is built on â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── the two array questions the messaging transfer-list walk is built on ────────────────────
 
     [Theory]
     [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
@@ -275,7 +275,7 @@ public partial class JsealConformanceTests
         Assert.Equal("a,b", Eval(realm, "Array.prototype.join.call(appended, ',')", "test:append"));
     }
 
-    // â”€â”€ the realm's own answers about itself â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── the realm's own answers about itself ───────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(Engines))]
@@ -316,7 +316,7 @@ public partial class JsealConformanceTests
         realm.Dispose();
     }
 
-    // â”€â”€ binary data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── binary data ────────────────────────────────────────────────────────────────────────────
     //
     // Two members and three operations: mint a buffer over host bytes, tell a buffer from everything
     // else, and read one back. The bridge needs all three - a factory alone would leave the test and
@@ -465,7 +465,7 @@ public partial class JsealConformanceTests
     /// <b>This is the assertion that a provider reading a buffer through the realm's own intrinsics
     /// reads it by brand and not by anything a page can write.</b> A provider with no binary member
     /// on its host surface has to go through the guest's objects to get at the bytes, and the moment
-    /// it asks one of them a <em>question</em> â€” how long are you? â€” it has put a page's code between
+    /// it asks one of them a <em>question</em> — how long are you? — it has put a page's code between
     /// the host and the answer.
     /// </para>
     /// <para>
@@ -619,12 +619,10 @@ public partial class JsealConformanceTests
         realm.DefineValue(realm.Global, "minted", minted);
         Assert.Equal(0, realm.GetProperty(realm.Global, "pageCalls").AsNumber);
 
-        // RECORDED GAP, Broiler.JS provider: the pinned engine's buffer constructor takes its
-        // prototype from the global named ArrayBuffer at the moment of the mint, so a page that
-        // replaced the global gives the host's buffer the page's prototype. Pinned here so that a
-        // fix is noticed; the bytes and the page-call count above are right on both providers.
+        // Broiler.JS took the prototype from the replaced global before 0.1.0-preview.2; its built-ins
+        // now record their realm's own constructor and prototype.
         Assert.Equal(
-            engine == "broiler-js" ? "false" : "true",
+            "true",
             Eval(realm, "String(Object.getPrototypeOf(minted) === OriginalBufferPrototype)", "test:patched-prototype"));
     }
 

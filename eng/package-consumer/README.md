@@ -147,7 +147,7 @@ the checkout's shipping projects already resolved (the `obj/project.assets.json`
 and both providers, which carry the whole `Broiler.*` engine closure) is staged from its
 package folder, checked against the recorded SHA-512, into a local `pinned-archives` source, and
 mapped there by exact id; so everything outside the candidate families restores byte-identical to
-the pinned build, and no credentials for the authenticated `Broiler.*` feed are needed. Any other
+the pinned build, without fetching any of them again. Any other
 package id, such as the test project's xunit packages, uses the normal sources. The candidate directory must
 therefore contain every package it introduces, at the versions they declare, including a new version
 of a package the checkout already resolved: that id is served only from `pinned-archives`, and the

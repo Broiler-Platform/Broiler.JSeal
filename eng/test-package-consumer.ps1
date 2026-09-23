@@ -120,8 +120,28 @@ function Read-PackageManifest([string] $Path) {
     finally { $zip.Dispose() }
 }
 
+# The SHA-512 a restore records for a package (project.assets.json) is NuGet's CONTENT hash, which for
+# a signed package - every package from nuget.org carries a repository signature - excludes the
+# signature and so is not the SHA-512 of the .nupkg file. The package folder keeps both:
+# <id>.<version>.nupkg.sha512 is the archive's own hash, and .nupkg.metadata's contentHash is the one
+# the restore recorded. Checks the archive against the first and the recorded hash against the
+# second, so the archive is tied to the restore either way, and returns the archive's hash.
+function Assert-RestoredArchive([string] $Archive, [string] $RecordedHash, [string] $Identity) {
+    $sidecar = "$Archive.sha512"
+    $metadata = Join-Path (Split-Path $Archive -Parent) '.nupkg.metadata'
+    if (!(Test-Path -LiteralPath $sidecar -PathType Leaf) -or !(Test-Path -LiteralPath $metadata -PathType Leaf)) {
+        throw "Incomplete NuGet package folder for $Identity."
+    }
+    $hash = Package-Hash $Archive
+    if ($hash -cne ([IO.File]::ReadAllText($sidecar).Trim())) { throw "NuGet archive hash mismatch for $Identity." }
+    if ((Get-Content -LiteralPath $metadata -Raw | ConvertFrom-Json).contentHash -cne $RecordedHash) {
+        throw "NuGet content hash mismatch for $Identity."
+    }
+    $hash
+}
+
 # Copies the archive of every package a restore resolved, from its package folder, after checking it
-# against the SHA-512 the restore recorded. Returns the identities copied; skips those in $Seen and
+# against what the restore recorded (Assert-RestoredArchive). Returns the identities copied; skips those in $Seen and
 # those $Skip answers true for.
 function Copy-ResolvedArchives([hashtable] $Assets, [string] $Destination, [hashtable] $Seen, [scriptblock] $Skip = { $false }) {
     foreach ($entry in $Assets.libraries.GetEnumerator() | Sort-Object Key) {
@@ -131,8 +151,7 @@ function Copy-ResolvedArchives([hashtable] $Assets, [string] $Destination, [hash
             Join-Path (Join-Path $_ $entry.Value.path) $archiveName
         } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1)
         if ($source.Count -ne 1) { throw "Missing NuGet archive for $($entry.Key); restore the provider packages first." }
-        $hash = Package-Hash $source[0]
-        if ($hash -cne $entry.Value.sha512) { throw "NuGet archive hash mismatch for $($entry.Key)." }
+        $null = Assert-RestoredArchive $source[0] $entry.Value.sha512 $entry.Key
         Copy-Item -LiteralPath $source[0] -Destination (Join-Path $Destination $archiveName)
         $Seen[$entry.Key] = $true
         $entry.Key
@@ -198,10 +217,10 @@ try {
         }
         $null = $nugetConfig.configuration.packageSourceMapping.AppendChild($candidateMapping)
         # The copy restores into a fresh cache, so every package the checkout already resolved would be
-        # fetched again - the Broiler.* engines from an authenticated feed. Stage those archives from the
-        # checkout's own restores instead, hash-checked, and map each by exact id to that local source:
-        # everything outside the candidate families then restores byte-identical to the pinned build,
-        # with no credentials. Only a package the candidate newly introduces uses the normal sources.
+        # fetched again. Stage those archives from the checkout's own restores instead, hash-checked,
+        # and map each by exact id to that local source: everything outside the candidate families then
+        # restores byte-identical to the pinned build, with no network access for them. Only a package
+        # the candidate newly introduces uses the normal sources.
         $pinnedFeed = Join-Path $workspace 'pinned-archives'
         New-Item -ItemType Directory -Path $pinnedFeed | Out-Null
         $candidatePatterns = @($candidateInfo.patterns) + @($candidateArchives | ForEach-Object { $_.id })
@@ -307,7 +326,11 @@ try {
             if ($entry.Value.type -ne 'package' -or !$identities.ContainsKey($entry.Key)) {
                 throw "$provider resolved a project or an unstaged package: $($entry.Key)"
             }
-            if ($entry.Value.sha512 -cne (Package-Hash $identities[$entry.Key])) { throw "Restored hash differs for $($entry.Key)." }
+            # The consumer's archive must be the staged one, byte for byte, and its restore record its own.
+            $restoredArchive = Join-Path (Join-Path $cache $entry.Value.path) ($entry.Key.Replace('/', '.').ToLowerInvariant() + '.nupkg')
+            if ((Assert-RestoredArchive $restoredArchive $entry.Value.sha512 $entry.Key) -cne (Package-Hash $identities[$entry.Key])) {
+                throw "Restored hash differs for $($entry.Key)."
+            }
         }
         $null = Invoke-Step "$provider-build" dotnet (@('build', 'Consumer.csproj', '-c', 'Release', '--no-restore', '--nologo') + $properties) $directory $BuildTimeoutSeconds $environment
         $output = Join-Path $directory 'bin/Release/net10.0'

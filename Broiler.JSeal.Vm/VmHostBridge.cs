@@ -20,7 +20,7 @@ namespace Broiler.JSeal.Vm;
 /// for a turn - which it cannot, being already in a step - could not re-enter this one.
 /// </para>
 /// </remarks>
-internal sealed class VmHostBridge : IJsHostSurface
+internal class VmHostBridge : IJsHostSurface
 {
     /// <summary>The realm the profile handed over, or null before instantiation completed.</summary>
     internal JsHostRealm? Realm { get; private set; }
@@ -32,7 +32,7 @@ internal sealed class VmHostBridge : IJsHostSurface
     /// <para>
     /// <b>It is captured here because <c>Promise</c> is an ordinary writable global and a page may
     /// assign over it.</b> The profile installs it <c>Writable | Configurable</c>, as the language
-    /// requires â€” so a provider that read <c>globalThis.Promise</c> at the moment the bridge wanted
+    /// requires — so a provider that read <c>globalThis.Promise</c> at the moment the bridge wanted
     /// a promise would hand a page's own constructor whatever <c>fetch</c> was about to resolve,
     /// and a page that had replaced it would receive every deferred result the bridge produces.
     /// Reading it once, before any guest program has run, is what makes <c>NewPromise</c> answer
@@ -150,6 +150,17 @@ internal sealed class VmHostBridge : IJsHostSurface
         TypedArraySet.Kind is JsHostValueKind.Function &&
         TypedArrayJoin.Kind is JsHostValueKind.Function;
 
+    /// <summary>
+    /// Whether the realm completed one structured clone - <c>undefined</c> through
+    /// <c>DetachClone</c> and <c>AdoptClone</c> - when it was handed over.
+    /// </summary>
+    /// <remarks>
+    /// The clone members are the host surface's own and depend on no optional composition surface in
+    /// the pinned profile, so this is expected to hold for every realm; it is performed rather than
+    /// assumed so that a realm never declares a capability it has not shown.
+    /// </remarks>
+    internal bool HasClone { get; private set; }
+
     /// <summary>The one crossing waiting for a step.</summary>
     internal Action<JsHostRealm>? Pending { get; set; }
 
@@ -158,7 +169,7 @@ internal sealed class VmHostBridge : IJsHostSurface
     /// This runs inside a step the profile opens at instantiation, so the crossing below is legal
     /// here and would not be from anywhere else this class is reachable from.
     /// </remarks>
-    public void OnRealmCreated(JsHostRealm realm)
+    public virtual void OnRealmCreated(JsHostRealm realm)
     {
         Realm = realm;
         Promise = realm.GetProperty(realm.Global, "Promise");
@@ -166,6 +177,20 @@ internal sealed class VmHostBridge : IJsHostSurface
         Eval = realm.GetProperty(realm.Global, "eval");
         ReflectDelete = realm.GetProperty(realm.GetProperty(realm.Global, "Reflect"), "deleteProperty");
         CaptureBinary(realm);
+        HasClone = ProbeClone(realm);
+    }
+
+    /// <summary>One same-realm clone of <c>undefined</c>; see <see cref="HasClone"/>.</summary>
+    private static bool ProbeClone(JsHostRealm realm)
+    {
+        try
+        {
+            return realm.AdoptClone(realm.DetachClone(JsHostValue.Undefined)).Kind is JsHostValueKind.Undefined;
+        }
+        catch (JsHostSurfaceException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

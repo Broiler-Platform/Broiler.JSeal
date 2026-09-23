@@ -5,7 +5,7 @@ namespace Broiler.JSeal.Vm;
 /// <summary>
 /// <see cref="IJsCalls"/>: calling into JavaScript, and raising a JavaScript error from host code.
 /// </summary>
-internal sealed partial class VmRealm
+internal partial class VmRealm
 {
     /// <inheritdoc />
     /// <remarks>

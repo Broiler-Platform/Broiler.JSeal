@@ -15,13 +15,13 @@ namespace Broiler.JSeal.BroilerJs;
 /// <para>
 /// <b>The algorithm is the engine's own, called at its static entry point.</b> Broiler.JS implements
 /// structured clone in <c>Broiler.JavaScript.Globals</c>, and this provider references that assembly
-/// for this one method â€” see the argument in the project file, which is where a reference that moves
+/// for this one method — see the argument in the project file, which is where a reference that moves
 /// the neutrality budget belongs. Calling the realm's <c>structuredClone</c> <em>global</em> instead
 /// would have needed no reference and does not work: the engine gates that export behind
 /// <c>JavaScriptFeatureFlags.StructuredClone</c>, an experimental flag that is off by default, so
 /// <c>typeof structuredClone</c> is <c>"undefined"</c> on a context this provider builds and on the
 /// one the host hands it to adopt alike. The static entry point is not gated, which is why the DOM
-/// bridge always called it directly â€” and calling it is all that moved.
+/// bridge always called it directly — and calling it is all that moved.
 /// </para>
 /// <para>
 /// <b>Reimplementing the algorithm here was the alternative, and it would have been a second
@@ -34,7 +34,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// <b>Operations that clone take the realm scope</b>, for the reason the class remarks give and with one
 /// extra consequence that is the point of putting the clone on the contract at all: the engine's
 /// clone mints its objects against the <em>current</em> context. Outside a scope it would mint into
-/// whatever realm the thread last touched â€” on the worker's delivery path, plausibly the page's.
+/// whatever realm the thread last touched — on the worker's delivery path, plausibly the page's.
 /// </para>
 /// </remarks>
 internal partial class BroilerJsRealm

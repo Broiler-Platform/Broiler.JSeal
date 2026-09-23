@@ -20,12 +20,12 @@ namespace Broiler.JSeal.BroilerJs;
 /// file runs for it.
 /// </para>
 /// <para>
-/// <b>Why module realms run their jobs inside a task.</b> The pinned engine turns each loaded module
-/// into a guest promise through <c>new JSPromise(Task)</c>, which settles through a bare
-/// <c>ContinueWith</c> on <see cref="TaskScheduler.Current"/>. Outside a task that is the thread pool,
-/// which would settle the promise beside the realm's thread and after the host may already have seen
-/// an empty queue. Running module work as a task on <see cref="ModuleTaskScheduler"/> makes the
-/// engine's own continuation a job in this realm's queue, drained like any other.
+/// <b>Why module realms run their jobs inside a task.</b> The engine's module loading is asynchronous
+/// .NET code: loading a graph, waiting a job before linking, and settling an evaluation are
+/// continuations scheduled on <see cref="TaskScheduler.Current"/>. Outside a task that is the thread
+/// pool, which would run them beside the realm's thread and after the host may already have seen an
+/// empty queue. Running module work as a task on <see cref="ModuleTaskScheduler"/> makes each such
+/// continuation a job in this realm's queue, drained like any other.
 /// </para>
 /// </remarks>
 internal partial class BroilerJsRealm
@@ -144,14 +144,25 @@ internal partial class BroilerJsRealm
         return BroilerJsMarshal.Wrap(JSException.ErrorFrom(exception));
     }
 
-    /// <summary>The engine's exports object for a module the engine has started evaluating.</summary>
+    /// <summary>
+    /// The engine's namespace object for a module the engine has linked, or null before the engine
+    /// has loaded and linked it (which it does when an evaluation of its graph starts).
+    /// </summary>
     internal JsValue? EngineNamespace(string internalName)
     {
         using var scope = Enter();
+        return EngineModule(internalName) is { Status: >= ModuleStatus.Linked } module
+            ? BroilerJsMarshal.Wrap(module.GetNamespace())
+            : null;
+    }
+
+    /// <summary>The engine's own record for a module, or null when the engine has not loaded it.</summary>
+    internal JSModule? EngineModule(string internalName)
+    {
         foreach (var module in ModuleContext!.All)
         {
             if (string.Equals(module.filePath, internalName, StringComparison.Ordinal))
-                return BroilerJsMarshal.Wrap(module.Exports);
+                return module;
         }
 
         return null;
@@ -241,12 +252,12 @@ internal sealed class BroilerJsModuleRealm(BroilerJsEngineProvider provider, JsR
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>No specifier reaches the engine's cache.</b> <c>JSModuleContext.LoadModuleAsync</c> looks up
-/// the raw specifier in its module cache before it calls <c>Resolve</c>, which is how it answers
-/// <c>module</c> and <c>clr</c> without asking anyone. The override replaces it: every request a
-/// module makes was resolved by the host when the graph was loaded, and the engine is only ever
-/// handed the adapter's internal name for the module that request names. <c>Resolve</c> accepts
-/// exactly those names.
+/// <b>Every request is the host's answer.</b> Broiler.JS 0.1.0-preview.3 resolves every request through
+/// <c>Resolve</c> - a root, and each static request of each module in the graph it links - and
+/// identifies a module by the key <c>Resolve</c> returns. The override answers a root with its own
+/// internal name and a module's request with the internal name of the module the host resolved it
+/// to when the map loaded the graph, and nothing else; the context registers no built-in
+/// <c>module</c> or <c>clr</c> module, so nothing outside the host's graph is reachable.
 /// </para>
 /// <para>
 /// An internal name is the module's source label, made unique within the map and never
@@ -254,10 +265,10 @@ internal sealed class BroilerJsModuleRealm(BroilerJsEngineProvider provider, JsR
 /// </para>
 /// </remarks>
 internal sealed class BroilerJsModuleContext(BroilerJsRealm realm, SynchronizationContext pump)
-    : JSModuleContext(pump, enableClrIntegration: false)
+    : JSModuleContext(pump, enableClrIntegration: false, registerBuiltInModules: false)
 {
     /// <summary>The parameter names the engine compiles a module body with, in its own order.</summary>
-    internal static readonly string[] ModuleParameters = ["exports", "require", "module", "import", "__fileame", "__dirname"];
+    internal static readonly string[] ModuleParameters = ["import", "#module"];
 
     /// <summary>Starts, or joins, the engine's evaluation of the module compiled under <paramref name="internalName"/>.</summary>
     internal Task<JSValue> LoadThroughEngine(string internalName) =>
@@ -266,8 +277,10 @@ internal sealed class BroilerJsModuleContext(BroilerJsRealm realm, Synchronizati
     protected override Task<JSValue> LoadModuleAsync(string? currentPath, string name, bool esModule = true, string? requiredType = null) =>
         realm.ImportForEngine(currentPath, name, esModule);
 
+    // The engine resolves every request through here, a module's static requests included, with the
+    // requesting module's "directory" - which is its internal name, see GetModuleDirectory.
     protected override string? Resolve(string? dirPath, string relativePath) =>
-        realm.ModuleSourceFor(relativePath) is null ? null : relativePath;
+        realm.ResolveModuleForEngine(dirPath, relativePath);
 
     // A module's own requests are looked up by the requesting module, so its "directory" is its name.
     protected override string GetModuleDirectory(string fullPath) => fullPath;

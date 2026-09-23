@@ -20,7 +20,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// <para>
 /// The pump carries <see cref="IJSJobPump"/>, which is the engine's marker for "a context that runs
 /// what it is given on the JavaScript thread, one item at a time". Without it the engine treats an
-/// ambient context as untrusted and takes its own internal queue instead â€” correct, but then the
+/// ambient context as untrusted and takes its own internal queue instead — correct, but then the
 /// jobs are somewhere this realm cannot count or drain, and <see cref="HasPendingJobs"/> would answer
 /// <see langword="false"/> with work outstanding.
 /// </para>
@@ -49,7 +49,7 @@ internal partial class BroilerJsRealm
     /// </para>
     /// <para>
     /// <b>A job that throws stops the drain, and its successors stay queued.</b> Swallowing it here
-    /// would lose the failure outright â€” JSEAL has no logger to report it to, by construction â€” while
+    /// would lose the failure outright — JSEAL has no logger to report it to, by construction — while
     /// leaving the rest of the queue intact means the next checkpoint runs them. The host drives the
     /// drain, so the host is where the report belongs.
     /// </para>
@@ -94,7 +94,7 @@ internal partial class BroilerJsRealm
     /// <b>The executor runs synchronously on this engine, and capturing out of it is exactly what the
     /// contract exists to avoid depending on.</b> <c>JSPromise</c>'s delegate constructor calls the
     /// delegate before it returns, so the two locals below are assigned by the time the constructor
-    /// has finished â€” which is what makes the capture safe here and nowhere else. Relying on that is
+    /// has finished — which is what makes the capture safe here and nowhere else. Relying on that is
     /// relying on an engine's scheduling: the bridge's deferred promise for
     /// <c>customElements.whenDefined</c> did it in bridge code, and would have broken on an engine
     /// that ran the executor later. Handing back the pair moves that dependency into the provider,
@@ -141,7 +141,7 @@ internal partial class BroilerJsRealm
     /// <remarks>
     /// Locked rather than a <c>ConcurrentQueue</c> because <see cref="Count"/> and
     /// <see cref="TryDequeue"/> have to agree with each other for a bounded drain, and because the
-    /// interesting concurrency is not two drains racing â€” the realm is driven by one thread â€” but a
+    /// interesting concurrency is not two drains racing — the realm is driven by one thread — but a
     /// host <c>Task</c> completing on the pool and posting a reaction into a queue the page thread is
     /// draining.
     /// </remarks>

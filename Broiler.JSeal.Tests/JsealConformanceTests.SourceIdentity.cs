@@ -71,9 +71,9 @@ public partial class JsealConformanceTests
     /// </summary>
     /// <remarks>
     /// ECMAScript counts CR, CRLF, LF, U+2028 and U+2029 as line terminators, including the one a line
-    /// continuation ends with. The pinned Broiler.JS lexer counts only LF and CRLF, and leaves its
-    /// compile frame at the start of an unterminated token, so it must report nothing for a lone CR,
-    /// U+2028, U+2029 or an unterminated string or template. The pinned Broiler.VM front end loses the
+    /// continuation ends with. The Broiler.JS provider reports nothing for a lone CR, U+2028 or U+2029,
+    /// and the pinned 0.1.0-preview.3 lexer does not count the line terminator of a line continuation,
+    /// so it must report nothing for one of those either. The pinned Broiler.VM front end loses the
     /// line of a continuation inside a template literal, so it must report nothing for that. A guest
     /// <c>Function</c> body compiles under the location <c>internal</c>, so a host label of that name
     /// must not adopt the body's line.
@@ -84,16 +84,16 @@ public partial class JsealConformanceTests
     {
         (string Source, int Line, bool JsCountsIt, bool VmCountsIt)[] cases =
         [
-            ("1;\n\n'abc", 3, false, true),
-            ("1;\n\n `abc", 3, false, true),
+            ("1;\n\n'abc", 3, true, true),
+            ("1;\n\n `abc", 3, true, true),
             ("1;\r\r var x = ;", 3, false, true),
             ("1;\u2028\u2028 var x = ;", 3, false, true),
             ("1;\u2029\u2029 var x = ;", 3, false, true),
             ("1;\n/*\u2028*/\n var x = ;", 4, false, true),
             ("`a\rb`;\n var x = ;", 3, false, true),
-            ("`a\\\nb`;\n var x = ;", 3, true, false),
-            ("String.raw`a\\\nb`;\n var x = ;", 3, true, false),
-            ("'a\\\n\\\nb';\n var x = ;", 4, true, true),
+            ("`a\\\nb`;\n var x = ;", 3, false, false),
+            ("String.raw`a\\\nb`;\n var x = ;", 3, false, false),
+            ("'a\\\n\\\nb';\n var x = ;", 4, false, true),
             ("1;\r\n\r\n var x = ;", 3, true, true),
             ("1;\n\n let a; let a;", 3, true, true),
         ];
@@ -262,9 +262,9 @@ public partial class JsealConformanceTests
     /// guest never wrote. This is the regression for that route.
     /// </para>
     /// <para>
-    /// The pinned Broiler.VM package has no caller-scope evaluation: its executor refuses a direct
-    /// eval in a function with an <c>EvalError</c> before any request is sent. That is a recorded
-    /// gap (VM V14), asserted here as the refusal it is, so a change on either side is noticed.
+    /// Broiler.VM evaluates a direct eval against the caller's scope from 0.1.0-preview.4 (VM V14),
+    /// sending the eval request its source provider decodes; earlier pins refused it with an
+    /// <c>EvalError</c>.
     /// </para>
     /// </remarks>
     [Theory]
@@ -278,27 +278,14 @@ public partial class JsealConformanceTests
         const string writes = "(function () { var y = 1; eval('y = y + 41'); return (function () { return y; })(); })()";
         const string strict = "(function () { 'use strict'; eval('var leaked = 1'); return typeof leaked; })()";
 
-        if (engine == "broiler-vm")
-        {
-            foreach (var source in new[] { reads, writes, strict })
-            {
-                var refused = Assert.Throws<JsEngineException>(() => realm.EvaluateHostScript(source, "test:direct-eval"));
-                Assert.Equal((source, "EvalError"), (source, realm.GetProperty(refused.Thrown, "name").AsString));
-            }
-        }
-        else
-        {
-            Assert.True(realm.EvaluateHostScript(reads, "test:direct-eval-reads") == JsValue.Number(7d));
-            Assert.True(realm.EvaluateHostScript(writes, "test:direct-eval-writes") == JsValue.Number(42d));
-            Assert.Equal("undefined", realm.EvaluateHostScript(strict, "test:direct-eval-strict").AsString);
-        }
+        Assert.True(realm.EvaluateHostScript(reads, "test:direct-eval-reads") == JsValue.Number(7d));
+        Assert.True(realm.EvaluateHostScript(writes, "test:direct-eval-writes") == JsValue.Number(42d));
+        Assert.Equal("undefined", realm.EvaluateHostScript(strict, "test:direct-eval-strict").AsString);
 
         // The eval'd text's own syntax error is still a SyntaxError of the eval'd text.
         var broken = Assert.Throws<JsEngineException>(
             () => realm.EvaluateHostScript("(function () { var z = 1; return eval('var = z;'); })()", "test:direct-eval-broken"));
-        Assert.Equal(
-            engine == "broiler-vm" ? "EvalError" : "SyntaxError",
-            realm.GetProperty(broken.Thrown, "name").AsString);
+        Assert.Equal("SyntaxError", realm.GetProperty(broken.Thrown, "name").AsString);
 
         // Without GuestEval a page's direct eval is refused rather than evaluated, also when host
         // script calls the page's function.
