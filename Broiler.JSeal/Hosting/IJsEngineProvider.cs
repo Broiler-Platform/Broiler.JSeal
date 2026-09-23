@@ -59,10 +59,31 @@ public sealed class JsRealmOptions
     public bool ForceStrictMode { get; init; }
 
     /// <summary>
-    /// Optional document URL metadata. Neither bundled provider currently uses this value for source
-    /// labels, module resolution or caching; its intended behavior is tracked by roadmap slice J17.
+    /// Optional document URL, used only as the fallback source identity for an evaluation whose
+    /// label is blank. See <see cref="SourceLabelFor"/>.
     /// </summary>
+    /// <remarks>
+    /// Diagnostic metadata only. Neither bundled provider uses it for module or import resolution,
+    /// caching, origin checks or evaluation permission, and it is not validated as a URL.
+    /// </remarks>
     public string? DocumentUrl { get; init; }
+
+    /// <summary>The source identity used when neither a label nor a document URL is supplied.</summary>
+    public const string AnonymousSourceLabel = "anonymous";
+
+    /// <summary>
+    /// Selects the source identity for one evaluation: a non-blank <paramref name="label"/> first,
+    /// then a non-blank <see cref="DocumentUrl"/>, then <see cref="AnonymousSourceLabel"/>.
+    /// </summary>
+    /// <remarks>
+    /// The selected value is returned unchanged and is diagnostic only. Providers report it through
+    /// <see cref="JsEngineException.SourceLabel"/>; it never selects an evaluation member, strictness
+    /// or permission, so a label cannot authorize source that its member would refuse.
+    /// </remarks>
+    public string SourceLabelFor(string? label) =>
+        !string.IsNullOrWhiteSpace(label) ? label
+        : !string.IsNullOrWhiteSpace(DocumentUrl) ? DocumentUrl
+        : AnonymousSourceLabel;
 
     /// <summary>The default: an unrestricted realm with no document.</summary>
     public static JsRealmOptions Default { get; } = new();

@@ -135,7 +135,7 @@ public sealed class VmEngineProvider : IJsEngineProvider
                                   JsCapabilities.ClassicScriptSource |
                                   JsCapabilities.GuestEval);
 
-            return new VmRealm(runtime, artifact, instance, bridge, sources, capabilities, Name);
+            return new VmRealm(runtime, artifact, instance, bridge, sources, options, capabilities, Name);
         }
         catch
         {

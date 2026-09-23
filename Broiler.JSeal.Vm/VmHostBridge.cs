@@ -102,7 +102,7 @@ internal sealed class VmHostBridge : IJsHostSurface
     /// <summary>
     /// The realm's binary intrinsics, taken at the same moment and for the same reason as
     /// <see cref="Promise"/>: <c>ArrayBuffer</c>, <c>Uint8Array</c>, the <c>byteLength</c> getter off
-    /// <c>ArrayBuffer.prototype</c>, and the four functions the bulk transfer uses.
+    /// <c>ArrayBuffer.prototype</c>, and the two functions the bulk transfer uses.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -140,9 +140,6 @@ internal sealed class VmHostBridge : IJsHostSurface
     internal JsHostValue TypedArraySet { get; private set; }
 
     /// <inheritdoc cref="ArrayBuffer"/>
-    internal JsHostValue TypedArraySubarray { get; private set; }
-
-    /// <inheritdoc cref="ArrayBuffer"/>
     internal JsHostValue TypedArrayJoin { get; private set; }
 
     /// <summary>Whether every binary intrinsic the provider needs was on the realm.</summary>
@@ -151,7 +148,6 @@ internal sealed class VmHostBridge : IJsHostSurface
         Uint8Array.Kind is JsHostValueKind.Function &&
         ArrayBufferByteLength.Kind is JsHostValueKind.Function &&
         TypedArraySet.Kind is JsHostValueKind.Function &&
-        TypedArraySubarray.Kind is JsHostValueKind.Function &&
         TypedArrayJoin.Kind is JsHostValueKind.Function;
 
     /// <summary>The one crossing waiting for a step.</summary>
@@ -189,7 +185,6 @@ internal sealed class VmHostBridge : IJsHostSurface
 
         var viewPrototype = realm.GetProperty(Uint8Array, "prototype");
         TypedArraySet = realm.GetProperty(viewPrototype, "set");
-        TypedArraySubarray = realm.GetProperty(viewPrototype, "subarray");
         TypedArrayJoin = realm.GetProperty(viewPrototype, "join");
 
         // The getter itself, not the property: reading `ArrayBuffer.prototype.byteLength` would

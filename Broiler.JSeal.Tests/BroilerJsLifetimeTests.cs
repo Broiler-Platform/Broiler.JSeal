@@ -13,7 +13,7 @@ public class BroilerJsLifetimeTests
         using var context = new JSContext();
         var provider = new BroilerJsEngineProvider();
         Assert.True(provider.TryAdopt(context, new JsRealmOptions { AllowGuestEval = false }, out var adopted));
-        using var realm = adopted!;
+        using var realm = adopted;
         var ran = 0;
         realm.EnqueueJob(() => ran++);
         realm.Dispose();
@@ -26,14 +26,24 @@ public class BroilerJsLifetimeTests
     }
 
     [Fact]
+    public void AdoptingAnUnsupportedRealmAnswersFalseWithNoWrapper()
+    {
+        var provider = new BroilerJsEngineProvider();
+
+        // IJsRealmAdoption.TryAdopt is [NotNullWhen(true)]: false must come with a null result.
+        Assert.False(provider.TryAdopt(new object(), JsRealmOptions.Default, out var realm));
+        Assert.Null(realm);
+    }
+
+    [Fact]
     public void DisposingAPermissiveWrapperDoesNotRemoveAnotherWrappersPolicy()
     {
         using var context = new JSContext();
         var provider = new BroilerJsEngineProvider();
         Assert.True(provider.TryAdopt(context, new JsRealmOptions { AllowGuestEval = false }, out var restricted));
-        using var owner = restricted!;
+        using var owner = restricted;
         Assert.True(provider.TryAdopt(context, JsRealmOptions.Default, out var permissive));
-        using var wrapper = permissive!;
+        using var wrapper = permissive;
         wrapper.Dispose();
 
         Assert.Throws<JsEngineException>(() => owner.EvaluateClassicScript("eval('42')", "test:retained-policy"));
@@ -52,7 +62,7 @@ public class BroilerJsLifetimeTests
             using var context = new JSContext(pump);
             var provider = new BroilerJsEngineProvider();
             Assert.True(provider.TryAdopt(context, JsRealmOptions.Default, out var adopted));
-            using var realm = adopted!;
+            using var realm = adopted;
             realm.EvaluateClassicScript("var settled = 0; Promise.resolve().then(function () { settled = 42; });", "test:host-queue");
             Assert.False(realm.HasPendingJobs);
             Assert.NotEmpty(pump.Jobs);
@@ -67,6 +77,28 @@ public class BroilerJsLifetimeTests
         {
             SynchronizationContext.SetSynchronizationContext(previous);
         }
+    }
+
+    /// <summary>
+    /// An adopted realm never implements the module contract, even over an engine module context and
+    /// even from a provider instance with the module gate set: the context keeps its own resolution
+    /// and its pre-registered <c>module</c> specifier, which JSEAL cannot route through a host.
+    /// </summary>
+    [Fact]
+    public void AnAdoptedModuleContextIsNotAModuleRealm()
+    {
+        using var context = new Broiler.JavaScript.Modules.JSModuleContext(null, enableClrIntegration: false);
+        var provider = new BroilerJsEngineProvider { EnableModuleContract = true };
+
+        Assert.True(provider.TryAdopt(context, JsRealmOptions.Default, out var adopted));
+        using var realm = adopted!;
+        Assert.False(realm is IJsModules);
+        Assert.False(realm.Capabilities.HasFlag(JsCapabilities.Modules));
+
+        // The created realm from the same instance does implement it, and still claims no flag.
+        using var created = provider.CreateRealm(JsRealmOptions.Default);
+        Assert.True(created is IJsModules);
+        Assert.Equal(new BroilerJsEngineProvider().Capabilities, created.Capabilities);
     }
 
     private sealed class HostPump : SynchronizationContext, IJSJobPump

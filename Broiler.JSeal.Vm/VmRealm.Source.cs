@@ -1,4 +1,5 @@
 ﻿using Broiler.VM.Profile.JavaScript;
+using Broiler.VM.Profile.JavaScript.Compiler;
 
 namespace Broiler.JSeal.Vm;
 
@@ -84,22 +85,73 @@ internal sealed partial class VmRealm
     /// <c>VmHostBridge.Eval</c> for the measurement, and
     /// <c>APageThatReplacesEvalCannotBorrowTheHostsPermissionToCompile</c> for the case.
     /// </para>
+    /// <para>
+    /// <b>Source identity is attributed here, not by the VM.</b> A guest throw escaping this call
+    /// carries the selected label. When the throw is the refusal of the compilation this call
+    /// requested, it also carries the front end's line and column. Those positions refer to the
+    /// supplied text, because forced strictness is a compiler flag rather than a prepended
+    /// directive. Text in which the front end may lose a line reports no position at all. The pinned
+    /// VM supplies no guest stack, so no frames or run-time positions are reported.
+    /// </para>
     /// </remarks>
-    private JsValue Evaluate(string source, string label, VmSourceProvider.SourceKind kind) =>
-        InStep(realm =>
+    private JsValue Evaluate(string source, string label, VmSourceProvider.SourceKind kind)
+    {
+        var sourceLabel = _options.SourceLabelFor(label);
+
+        return InStep(realm =>
         {
             var evaluate = _bridge.Eval;
 
             if (evaluate.Kind is not JsHostValueKind.Function)
             {
                 throw new JsEngineException(
-                    $"this realm has no 'eval', so '{label}' cannot be evaluated in it");
+                    $"this realm has no 'eval', so '{sourceLabel}' cannot be evaluated in it");
             }
 
             JsHostValue[] arguments = [JsHostValue.String(source)];
 
             using var permit = _sources.EnterScript(kind);
-            return VmMarshal.Wrap(realm.Invoke(evaluate, JsHostValue.Undefined, arguments));
+
+            try
+            {
+                return VmMarshal.Wrap(realm.Invoke(evaluate, JsHostValue.Undefined, arguments));
+            }
+            catch (JsHostThrowException thrown)
+            {
+                var failure = MayMiscountLines(source) ? null : _sources.RequestedFailure;
+
+                throw new JsEngineException(thrown.Message, VmMarshal.Wrap(thrown.Thrown), thrown)
+                {
+                    SourceLabel = sourceLabel,
+                    SourceLine = failure?.Line,
+                    SourceColumn = failure?.Column,
+                };
+            }
         });
+    }
+
+    /// <summary>
+    /// Whether the text may hold a line continuation inside a template literal, whose line terminator
+    /// the pinned front end does not count, so a diagnostic after it names the wrong line.
+    /// </summary>
+    /// <remarks>
+    /// Telling a template from a string or comment needs a lexer, so any backquote together with any
+    /// backslash before a line terminator reports no position rather than a plausible wrong one.
+    /// Continuations in strings, and CR, CRLF, U+2028 and U+2029 elsewhere, are counted as ECMAScript
+    /// counts them.
+    /// </remarks>
+    private static bool MayMiscountLines(string source)
+    {
+        if (!source.Contains('`'))
+            return false;
+
+        for (var i = source.IndexOf('\\'); i >= 0 && i + 1 < source.Length; i = source.IndexOf('\\', i + 1))
+        {
+            if (source[i + 1] is '\r' or '\n' or '\u2028' or '\u2029')
+                return true;
+        }
+
+        return false;
+    }
 }
 

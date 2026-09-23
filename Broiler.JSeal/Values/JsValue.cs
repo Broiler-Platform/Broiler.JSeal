@@ -7,7 +7,8 @@ namespace Broiler.JSeal;
 /// The kind, numeric field and opaque reference represent primitives without a separate carrier
 /// object per value. Providers maintain canonical identity for object references. The layout is
 /// 24 bytes on measured x64 builds, not a wire format. Cheap inspections never enter the engine;
-/// coercion belongs to IJsValues. BigInt is opaque and has documented truthiness/equality limits.
+/// coercion belongs to IJsValues. BigInt is opaque: its truthiness is IJsValues.ToBoolean and its
+/// value equality IJsValues.IsStrictlyEqual; this struct's operator compares BigInt handles by reference.
 /// </remarks>
 public readonly struct JsValue : IEquatable<JsValue>
 {
@@ -157,7 +158,8 @@ public readonly struct JsValue : IEquatable<JsValue>
     /// <remarks>
     /// Missing, Undefined and Null are false; booleans, numbers and strings use their stored value.
     /// Reference kinds return true. BigInt is an opaque reference, so this member cannot distinguish
-    /// zero from nonzero BigInts; only its provider can do that.
+    /// zero from nonzero BigInts and answers <see langword="true"/> for <c>0n</c>; only its provider
+    /// can decide it, through <see cref="IJsValues.ToBoolean"/>.
     /// </remarks>
     public bool AsBoolean => _kind switch
     {
@@ -198,9 +200,20 @@ public readonly struct JsValue : IEquatable<JsValue>
 
     /// <summary>Strict equality for kinds whose value is available without entering the engine.</summary>
     /// <remarks>
+    /// <para>
     /// NaN is unequal to itself; Equals is reflexive for .NET collection use. Object kinds compare by
-    /// canonical identity. BigInt also compares by reference, so independently created equal BigInts
-    /// may compare unequal here; mathematical BigInt equality is not currently a realm contract.
+    /// canonical identity.
+    /// </para>
+    /// <para>
+    /// <b>BigInt handles compare by reference, and that is the contract, not an approximation of
+    /// <c>===</c>.</b> A <see langword="true"/> answer means the two handles carry one value; a
+    /// <see langword="false"/> answer says nothing about their integers, because whether two handles
+    /// for one value share a reference is up to the provider (one hands back the engine's own value,
+    /// another a new box per crossing). Mathematical BigInt equality is
+    /// <see cref="IJsValues.IsStrictlyEqual"/>, which asks the provider. Keeping this operator, and
+    /// <see cref="Equals(JsValue)"/> and <see cref="GetHashCode"/> with it, by reference keeps every
+    /// dictionary and list a host keys on a handle hashing as it always has.
+    /// </para>
     /// </remarks>
     public static bool operator ==(JsValue left, JsValue right)
     {

@@ -25,7 +25,7 @@ namespace Broiler.JSeal.BroilerJs;
 /// <see langword="false"/> with work outstanding.
 /// </para>
 /// </remarks>
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     private readonly JobQueue _jobs;
     private readonly JobPump _pump;
@@ -58,11 +58,18 @@ internal sealed partial class BroilerJsRealm
     {
         ThrowIfDisposed();
 
+        // Refused before a job is dequeued: a host that drains from Resolve or LoadAsync must not lose one.
+        ThrowIfInModuleHost();
+
         var ran = 0;
         while (ran < limit && _jobs.TryDequeue(out var job))
         {
             // Translate guest throws while leaving host exceptions and the remaining queue intact.
-            Execute(job, static action => action());
+            // A module realm runs each job as a task on its scheduler; see BroilerJsRealm.Modules.cs.
+            if (_moduleScheduler is { } scheduler)
+                scheduler.RunInline(() => Execute(job, static action => action()));
+            else
+                Execute(job, static action => action());
             ran++;
         }
 

@@ -13,10 +13,11 @@ public partial class JsealConformanceTests
     // â”€â”€ source â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
     public void EvaluatingHostScriptAnswersTheValueOfTheLastExpression(string engine)
     {
         using var realm = NewRealm(engine);
+        AssertHas(realm, JsCapabilities.HostScriptSource);
 
         Assert.True(realm.EvaluateHostScript("2 + 3", "test:host") == JsValue.Number(5d));
         Assert.True(realm.EvaluateHostScript("'a' + 'b'", "test:host-string") == JsValue.String("ab"));
@@ -24,7 +25,7 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.GuestEval | JsCapabilities.HostScriptSource)]
     public void ARealmBuiltWithoutGuestEvalRefusesDynamicSourceAndStillRunsHostScript(string engine)
     {
         var provider = Provider(engine);
@@ -58,6 +59,7 @@ public partial class JsealConformanceTests
     /// A realm whose policy forbids <c>'unsafe-eval'</c> still runs the page's script ELEMENTS.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// <b>This is the assertion the two-member contract could not make, and its absence was a bug
     /// waiting for a host to write one line.</b> <c>script-src</c> and <c>'unsafe-eval'</c> are
     /// different directives: a page served <c>script-src 'unsafe-inline'</c> runs every one of its
@@ -65,9 +67,16 @@ public partial class JsealConformanceTests
     /// policy and narrowed the realm â€” which the provider contract instructs it to do â€” would have
     /// refused that page's ordinary scripts. Nothing in this repository had written that line yet,
     /// so the defect was latent rather than live, and this test is what stops it being written.
+    /// </para>
+    /// <para>
+    /// Its rows come from ClassicScriptSource alone. A provider with classic script and no GuestEval
+    /// is exactly the realm a restrictive policy produces, and it must be witnessed too; the control
+    /// half that evaluates dynamic source runs only where GuestEval is declared, and elsewhere the
+    /// permissive realm must refuse it as well.
+    /// </para>
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.ClassicScriptSource)]
     public void AClassicScriptRunsInARealmThatForbidsGuestEvaluation(string engine)
     {
         var provider = Provider(engine);
@@ -75,8 +84,8 @@ public partial class JsealConformanceTests
         using var restricted = provider.CreateRealm(new JsRealmOptions { AllowGuestEval = false });
 
         // The ability survives the narrowing; only the permission goes.
+        AssertHas(restricted, JsCapabilities.ClassicScriptSource);
         Assert.False(restricted.Capabilities.HasFlag(JsCapabilities.GuestEval));
-        Assert.True(restricted.Capabilities.HasFlag(JsCapabilities.ClassicScriptSource));
 
         Assert.True(restricted.EvaluateClassicScript("6 * 7", "test:classic") == JsValue.Number(42d));
 
@@ -85,11 +94,24 @@ public partial class JsealConformanceTests
 
         // The control, and it is doing real work: a provider whose EvaluateClassicScript refused
         // everything would satisfy nothing above, but one whose EvaluateDynamicSource refused
-        // everything â€” narrowed or not â€” would satisfy the refusal having tested no narrowing.
+        // everything - narrowed or not - would satisfy the refusal having tested no narrowing.
         using var permissive = provider.CreateRealm(JsRealmOptions.Default);
 
+        AssertHas(permissive, JsCapabilities.ClassicScriptSource);
         Assert.True(permissive.EvaluateClassicScript("6 * 7", "test:classic-permitted") == JsValue.Number(42d));
-        Assert.True(permissive.EvaluateDynamicSource("6 * 7", "test:dynamic-permitted") == JsValue.Number(42d));
+
+        if (provider.Capabilities.HasFlag(JsCapabilities.GuestEval))
+        {
+            AssertHas(permissive, JsCapabilities.GuestEval);
+            Assert.True(permissive.EvaluateDynamicSource("6 * 7", "test:dynamic-permitted") == JsValue.Number(42d));
+        }
+        else
+        {
+            // Without the ability there is no narrowing to observe, and the refusal is the provider's.
+            var refusal = Assert.Throws<JsCapabilityUnavailableException>(
+                () => permissive.EvaluateDynamicSource("6 * 7", "test:dynamic-unavailable"));
+            Assert.Equal(JsCapabilities.GuestEval, refusal.Missing);
+        }
     }
 
     /// <summary>
@@ -305,7 +327,8 @@ public partial class JsealConformanceTests
             return "unparsed";
         }
 
-        return realm.GetProperty(realm.Global, name).AsString;
+        var outcome = realm.GetProperty(realm.Global, name);
+        return outcome.AsString ?? $"not-a-string:{outcome.Kind}";
     }
 
     /// <summary>
@@ -375,20 +398,12 @@ public partial class JsealConformanceTests
     }
 
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.GlobalIsVariableScope | JsCapabilities.HostScriptSource)]
     public void ATopLevelDeclarationBecomesAPropertyOfTheGlobal(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.GlobalIsVariableScope))
-        {
-            // The bridge depends on this and does not know it does: a nested browsing context
-            // recovers a frame's declarations by diffing the global's own names across the
-            // evaluation, which finds nothing at all on an engine that scopes them elsewhere.
-            realm.EvaluateHostScript("var declaredAtTopLevel = 7;", "test:var");
-            Assert.True(realm.GetProperty(realm.Global, "declaredAtTopLevel").IsUndefined);
-            return;
-        }
+        AssertHas(realm, JsCapabilities.GlobalIsVariableScope | JsCapabilities.HostScriptSource);
 
         var before = realm.OwnPropertyNames(realm.Global);
         realm.EvaluateHostScript("var declaredAtTopLevel = 7; function declaredFunction() { return 8; }", "test:var");
@@ -421,13 +436,12 @@ public partial class JsealConformanceTests
     /// </para>
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
     public void APageThatReplacesEvalDoesNotInterceptTheHostsOwnScript(string engine)
     {
         using var realm = NewRealm(engine);
 
-        if (Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.HostScriptSource);
 
         // The page replaces the global, exactly as it is entitled to.
         realm.EvaluateHostScript(
@@ -455,15 +469,14 @@ public partial class JsealConformanceTests
     /// provider believes it is talking to itself.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Engines))]
+    [MemberData(nameof(EnginesDeclaring), JsCapabilities.HostScriptSource)]
     public void APageThatReplacesEvalCannotBorrowTheHostsPermissionToCompile(string engine)
     {
         var provider = Provider(engine);
 
         using var realm = provider.CreateRealm(new JsRealmOptions { AllowGuestEval = false });
 
-        if (Lacks(realm, JsCapabilities.HostScriptSource))
-            return;
+        AssertHas(realm, JsCapabilities.HostScriptSource);
 
         realm.EvaluateHostScript(
             "var borrowed = 'not tried';" +

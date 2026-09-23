@@ -2,7 +2,7 @@ using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JSeal.BroilerJs;
 
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     // Explicit state lets callers use cached static delegates instead of allocating closures
     // on every property read. Translation happens before the realm and its pump are restored.

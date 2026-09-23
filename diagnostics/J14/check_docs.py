@@ -1,13 +1,29 @@
 """Check local Markdown links/anchors and example project paths; no network access."""
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
-files = [ROOT / p for p in subprocess.check_output(
-    ["rg", "--files", "-g", "*.md"], cwd=ROOT, text=True).splitlines()]
+
+
+def markdown_files():
+    """Markdown files that are not ignored, as ripgrep lists them; git ls-files when rg is absent."""
+    if shutil.which("rg"):
+        listed = subprocess.check_output(["rg", "--files", "-g", "*.md"], cwd=ROOT, text=True).splitlines()
+    else:
+        # Tracked plus untracked-but-not-ignored, which is what rg honours from .gitignore. rg also
+        # skips hidden paths by default, so they are dropped here to check the same set.
+        listed = [p for p in subprocess.check_output(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+            cwd=ROOT, text=True).split("\0")
+            if p and not any(part.startswith(".") for part in Path(p).parts) and (ROOT / p).is_file()]
+    return sorted({Path(p).as_posix() for p in listed})
+
+
+files = [ROOT / p for p in markdown_files()]
 errors = []
 checked = 0
 

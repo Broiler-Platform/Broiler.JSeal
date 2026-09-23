@@ -1,0 +1,744 @@
+{
+  "phase": "before",
+  "timestampUtc": "2026-09-21T19:40:31.5103766+00:00",
+  "framework": ".NET 10.0.12",
+  "os": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "tieredCompilation": "0",
+  "samples": 3,
+  "providerSha256": "3cd11e51c3f9fe7dc4715926d7f416d010c0741eaa2e31f1427c8ff89a0b4f6c",
+  "valuesSourceSha256": "3335b95a8a51fe66aa33220952f567b44910dbc93e2d2e52eac98c4cea071f2e",
+  "vmAssembly": "Broiler.VM.Profile.JavaScript, Version=0.1.0.0, Culture=neutral, PublicKeyToken=null",
+  "vmInformationalVersion": "0.1.0-preview.3\u002B405fe2d234bbae69b1ea70dac603bbfe24978760",
+  "vmAssemblySha256": "6b925c5925d1123f512837446ef16afe548581aa828a1bca9ab0fe43579b18b8",
+  "measurements": [
+    {
+      "size": 0,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 64,
+      "allocatedBytes": [
+        135384,
+        135168,
+        135168
+      ],
+      "bytesPerOperation": [
+        2115.375,
+        2112,
+        2112
+      ],
+      "hostCallsPerOperation": [
+        1,
+        1,
+        1
+      ],
+      "fuelPerOperation": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "size": 0,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 64,
+      "allocatedBytes": [
+        9728,
+        9728,
+        9728
+      ],
+      "bytesPerOperation": [
+        152,
+        152,
+        152
+      ],
+      "hostCallsPerOperation": [
+        1,
+        1,
+        1
+      ],
+      "fuelPerOperation": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "size": 0,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 64,
+      "allocatedBytes": [
+        177304,
+        178384,
+        162816
+      ],
+      "bytesPerOperation": [
+        2770.375,
+        2787.25,
+        2544
+      ],
+      "hostCallsPerOperation": [
+        2,
+        2,
+        2
+      ],
+      "fuelPerOperation": [
+        26,
+        26,
+        26
+      ]
+    },
+    {
+      "size": 0,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 64,
+      "allocatedBytes": [
+        56992,
+        47720,
+        37376
+      ],
+      "bytesPerOperation": [
+        890.5,
+        745.625,
+        584
+      ],
+      "hostCallsPerOperation": [
+        2,
+        2,
+        2
+      ],
+      "fuelPerOperation": [
+        26,
+        26,
+        26
+      ]
+    },
+    {
+      "size": 1,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 64,
+      "allocatedBytes": [
+        166352,
+        167528,
+        162304
+      ],
+      "bytesPerOperation": [
+        2599.25,
+        2617.625,
+        2536
+      ],
+      "hostCallsPerOperation": [
+        3,
+        3,
+        3
+      ],
+      "fuelPerOperation": [
+        33,
+        33,
+        33
+      ]
+    },
+    {
+      "size": 1,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 64,
+      "allocatedBytes": [
+        40912,
+        42088,
+        36864
+      ],
+      "bytesPerOperation": [
+        639.25,
+        657.625,
+        576
+      ],
+      "hostCallsPerOperation": [
+        3,
+        3,
+        3
+      ],
+      "fuelPerOperation": [
+        33,
+        33,
+        33
+      ]
+    },
+    {
+      "size": 1,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 64,
+      "allocatedBytes": [
+        199736,
+        221392,
+        211048
+      ],
+      "bytesPerOperation": [
+        3120.875,
+        3459.25,
+        3297.625
+      ],
+      "hostCallsPerOperation": [
+        4,
+        4,
+        4
+      ],
+      "fuelPerOperation": [
+        43,
+        43,
+        43
+      ]
+    },
+    {
+      "size": 1,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 64,
+      "allocatedBytes": [
+        74296,
+        75368,
+        85608
+      ],
+      "bytesPerOperation": [
+        1160.875,
+        1177.625,
+        1337.625
+      ],
+      "hostCallsPerOperation": [
+        4,
+        4,
+        4
+      ],
+      "fuelPerOperation": [
+        43,
+        43,
+        43
+      ]
+    },
+    {
+      "size": 64,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 64,
+      "allocatedBytes": [
+        248272,
+        249448,
+        244224
+      ],
+      "bytesPerOperation": [
+        3879.25,
+        3897.625,
+        3816
+      ],
+      "hostCallsPerOperation": [
+        3,
+        3,
+        3
+      ],
+      "fuelPerOperation": [
+        96,
+        96,
+        96
+      ]
+    },
+    {
+      "size": 64,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 64,
+      "allocatedBytes": [
+        122832,
+        124008,
+        118784
+      ],
+      "bytesPerOperation": [
+        1919.25,
+        1937.625,
+        1856
+      ],
+      "hostCallsPerOperation": [
+        3,
+        3,
+        3
+      ],
+      "fuelPerOperation": [
+        96,
+        96,
+        96
+      ]
+    },
+    {
+      "size": 64,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 64,
+      "allocatedBytes": [
+        494136,
+        495208,
+        505448
+      ],
+      "bytesPerOperation": [
+        7720.875,
+        7737.625,
+        7897.625
+      ],
+      "hostCallsPerOperation": [
+        4,
+        4,
+        4
+      ],
+      "fuelPerOperation": [
+        232,
+        232,
+        232
+      ]
+    },
+    {
+      "size": 64,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 64,
+      "allocatedBytes": [
+        389280,
+        369768,
+        380008
+      ],
+      "bytesPerOperation": [
+        6082.5,
+        5777.625,
+        5937.625
+      ],
+      "hostCallsPerOperation": [
+        4,
+        4,
+        4
+      ],
+      "fuelPerOperation": [
+        232,
+        232,
+        232
+      ]
+    },
+    {
+      "size": 8000,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 16,
+      "allocatedBytes": [
+        2127208,
+        2125824,
+        2128488
+      ],
+      "bytesPerOperation": [
+        132950.5,
+        132864,
+        133030.5
+      ],
+      "hostCallsPerOperation": [
+        3,
+        3,
+        3
+      ],
+      "fuelPerOperation": [
+        8032,
+        8032,
+        8032
+      ]
+    },
+    {
+      "size": 8000,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 16,
+      "allocatedBytes": [
+        2095848,
+        2094464,
+        2095848
+      ],
+      "bytesPerOperation": [
+        130990.5,
+        130904,
+        130990.5
+      ],
+      "hostCallsPerOperation": [
+        3,
+        3,
+        3
+      ],
+      "fuelPerOperation": [
+        8032,
+        8032,
+        8032
+      ]
+    },
+    {
+      "size": 8000,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 16,
+      "allocatedBytes": [
+        9669712,
+        9668968,
+        9670352
+      ],
+      "bytesPerOperation": [
+        604357,
+        604310.5,
+        604397
+      ],
+      "hostCallsPerOperation": [
+        4,
+        4,
+        4
+      ],
+      "fuelPerOperation": [
+        24040,
+        24040,
+        24040
+      ]
+    },
+    {
+      "size": 8000,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 16,
+      "allocatedBytes": [
+        9639736,
+        9637608,
+        9637608
+      ],
+      "bytesPerOperation": [
+        602483.5,
+        602350.5,
+        602350.5
+      ],
+      "hostCallsPerOperation": [
+        4,
+        4,
+        4
+      ],
+      "fuelPerOperation": [
+        24040,
+        24040,
+        24040
+      ]
+    },
+    {
+      "size": 8001,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 16,
+      "allocatedBytes": [
+        2133736,
+        2135016,
+        2132352
+      ],
+      "bytesPerOperation": [
+        133358.5,
+        133438.5,
+        133272
+      ],
+      "hostCallsPerOperation": [
+        5,
+        5,
+        5
+      ],
+      "fuelPerOperation": [
+        8057,
+        8057,
+        8057
+      ]
+    },
+    {
+      "size": 8001,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 16,
+      "allocatedBytes": [
+        2102376,
+        2103656,
+        2100992
+      ],
+      "bytesPerOperation": [
+        131398.5,
+        131478.5,
+        131312
+      ],
+      "hostCallsPerOperation": [
+        5,
+        5,
+        5
+      ],
+      "fuelPerOperation": [
+        8057,
+        8057,
+        8057
+      ]
+    },
+    {
+      "size": 8001,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 16,
+      "allocatedBytes": [
+        9677624,
+        9676880,
+        9678264
+      ],
+      "bytesPerOperation": [
+        604851.5,
+        604805,
+        604891.5
+      ],
+      "hostCallsPerOperation": [
+        6,
+        6,
+        6
+      ],
+      "fuelPerOperation": [
+        24057,
+        24057,
+        24057
+      ]
+    },
+    {
+      "size": 8001,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 16,
+      "allocatedBytes": [
+        9646904,
+        9645520,
+        9645520
+      ],
+      "bytesPerOperation": [
+        602931.5,
+        602845,
+        602845
+      ],
+      "hostCallsPerOperation": [
+        6,
+        6,
+        6
+      ],
+      "fuelPerOperation": [
+        24057,
+        24057,
+        24057
+      ]
+    },
+    {
+      "size": 65536,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 8,
+      "allocatedBytes": [
+        8625768,
+        8628328,
+        8623104
+      ],
+      "bytesPerOperation": [
+        1078221,
+        1078541,
+        1077888
+      ],
+      "hostCallsPerOperation": [
+        19,
+        19,
+        19
+      ],
+      "fuelPerOperation": [
+        65760,
+        65760,
+        65760
+      ]
+    },
+    {
+      "size": 65536,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 8,
+      "allocatedBytes": [
+        8610088,
+        8612648,
+        8607424
+      ],
+      "bytesPerOperation": [
+        1076261,
+        1076581,
+        1075928
+      ],
+      "hostCallsPerOperation": [
+        19,
+        19,
+        19
+      ],
+      "fuelPerOperation": [
+        65760,
+        65760,
+        65760
+      ]
+    },
+    {
+      "size": 65536,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 8,
+      "allocatedBytes": [
+        39643024,
+        39643024,
+        39642280
+      ],
+      "bytesPerOperation": [
+        4955378,
+        4955378,
+        4955285
+      ],
+      "hostCallsPerOperation": [
+        20,
+        20,
+        20
+      ],
+      "fuelPerOperation": [
+        196760,
+        196760,
+        196760
+      ]
+    },
+    {
+      "size": 65536,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 8,
+      "allocatedBytes": [
+        39626600,
+        39627344,
+        39627344
+      ],
+      "bytesPerOperation": [
+        4953325,
+        4953418,
+        4953418
+      ],
+      "hostCallsPerOperation": [
+        20,
+        20,
+        20
+      ],
+      "fuelPerOperation": [
+        196760,
+        196760,
+        196760
+      ]
+    },
+    {
+      "size": 1048576,
+      "operation": "read",
+      "mode": "host-turn",
+      "iterations": 1,
+      "allocatedBytes": [
+        17147064,
+        17155216,
+        17147064
+      ],
+      "bytesPerOperation": [
+        17147064,
+        17155216,
+        17147064
+      ],
+      "hostCallsPerOperation": [
+        265,
+        265,
+        265
+      ],
+      "fuelPerOperation": [
+        1051752,
+        1051752,
+        1051752
+      ]
+    },
+    {
+      "size": 1048576,
+      "operation": "read",
+      "mode": "in-step",
+      "iterations": 1,
+      "allocatedBytes": [
+        17145104,
+        17153256,
+        17145104
+      ],
+      "bytesPerOperation": [
+        17145104,
+        17153256,
+        17145104
+      ],
+      "hostCallsPerOperation": [
+        265,
+        265,
+        265
+      ],
+      "fuelPerOperation": [
+        1051752,
+        1051752,
+        1051752
+      ]
+    },
+    {
+      "size": 1048576,
+      "operation": "construct",
+      "mode": "host-turn",
+      "iterations": 1,
+      "allocatedBytes": [
+        78925336,
+        78931880,
+        78922520
+      ],
+      "bytesPerOperation": [
+        78925336,
+        78931880,
+        78922520
+      ],
+      "hostCallsPerOperation": [
+        266,
+        266,
+        266
+      ],
+      "fuelPerOperation": [
+        3147602,
+        3147602,
+        3147602
+      ]
+    },
+    {
+      "size": 1048576,
+      "operation": "construct",
+      "mode": "in-step",
+      "iterations": 1,
+      "allocatedBytes": [
+        78970472,
+        78968840,
+        78956912
+      ],
+      "bytesPerOperation": [
+        78970472,
+        78968840,
+        78956912
+      ],
+      "hostCallsPerOperation": [
+        266,
+        266,
+        266
+      ],
+      "fuelPerOperation": [
+        3147602,
+        3147602,
+        3147602
+      ]
+    }
+  ]
+}

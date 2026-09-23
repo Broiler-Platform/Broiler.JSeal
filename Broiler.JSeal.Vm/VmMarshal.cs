@@ -28,16 +28,25 @@ internal static class VmMarshal
 
     /// <summary>A JSEAL handle as a VM value.</summary>
     /// <remarks>
+    /// <para>
     /// <b>A handle from another engine is refused here rather than dereferenced.</b> A host with two
     /// providers linked will hand the same <see cref="JsValue"/> to both, and the reference behind
     /// an object handle is whatever the engine that minted it put there - so a cast without a test
     /// is an invalid cast waiting for the second engine to exist. The realm's own foreign-realm
     /// check sits behind this one and catches the narrower case of a handle from a different realm
     /// of this same engine.
+    /// </para>
+    /// <para>
+    /// <b><see cref="JsValueKind.Missing"/> unwraps to <c>undefined</c></b>, as on the Broiler.JS
+    /// provider: Missing means the host supplied no value, and the only thing an engine can be handed
+    /// in place of a value it needs is <c>undefined</c>. Passed on as <see cref="JsHostValue.Missing"/>,
+    /// the profile resolves it to its uninitialised-binding marker, and a guest reading the argument,
+    /// property or callback result throws a ReferenceError instead of seeing <c>undefined</c>.
+    /// </para>
     /// </remarks>
     internal static JsHostValue Unwrap(JsValue value) => value.Kind switch
     {
-        JsValueKind.Missing => JsHostValue.Missing,
+        JsValueKind.Missing => JsHostValue.Undefined,
         JsValueKind.Undefined => JsHostValue.Undefined,
         JsValueKind.Null => JsHostValue.Null,
         JsValueKind.Boolean => JsHostValue.Boolean(value.AsBoolean),

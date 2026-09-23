@@ -31,21 +31,26 @@ namespace Broiler.JSeal.BroilerJs;
 /// per entry, rather than left to a caller who cannot see it.
 /// </para>
 /// </remarks>
-internal sealed partial class BroilerJsRealm : IJsRealm
+internal partial class BroilerJsRealm : IJsRealm
 {
     private readonly BroilerJsEngineProvider _provider;
     private readonly JSContext _context;
     private readonly JsCapabilities _capabilities;
     private readonly bool _allowGuestEval;
     private readonly bool _forceStrictMode;
+    private readonly JsRealmOptions _options;
     private readonly bool _ownsContext;
     private bool _disposed;
 
-    internal BroilerJsRealm(BroilerJsEngineProvider provider, JsRealmOptions options)
+    /// <param name="moduleContract">
+    /// Build the engine's module context and the module scheduler, for <see cref="BroilerJsModuleRealm"/>.
+    /// </param>
+    internal BroilerJsRealm(BroilerJsEngineProvider provider, JsRealmOptions options, bool moduleContract = false)
     {
         _provider = provider;
         _allowGuestEval = options.AllowGuestEval;
         _forceStrictMode = options.ForceStrictMode;
+        _options = options;
         _ownsContext = true;
 
         // The pump has to exist before the context does: JSContext captures the synchronization
@@ -56,7 +61,15 @@ internal sealed partial class BroilerJsRealm : IJsRealm
         // down.
         _jobs = new JobQueue();
         _pump = new JobPump(_jobs);
-        _context = new JSContext(_pump);
+        if (moduleContract)
+        {
+            _moduleScheduler = new ModuleTaskScheduler(_jobs);
+            _context = CreateModuleContext();
+        }
+        else
+        {
+            _context = new JSContext(_pump);
+        }
 
         // A realm is never wider than its provider and may be narrower: a page whose
         // Content-Security-Policy forbids evaluation gets a realm without GuestEval from an engine
@@ -87,10 +100,15 @@ internal sealed partial class BroilerJsRealm : IJsRealm
         // Two routes used to get past it, and both are closed in the engine: a dynamic function built
         // from no arguments returned before the dispatch, and ShadowRealm.prototype.evaluate never
         // raised it. What remains is code already running INSIDE a ShadowRealm, which dispatches on the
-        // child context nothing subscribes to. It is unreachable while evaluate is refused and
-        // importValue is unimplemented, and has to be revisited when importValue loads modules.
+        // child context nothing subscribes to (VM decision JSD-0030, follow-up SR-6). It is
+        // unreachable while evaluate is refused and importValue is unimplemented, and has to be
+        // revisited when importValue loads modules; the child context is built inside the engine's
+        // ShadowRealm constructor, so there is nothing here to subscribe to. The upstream fix is for
+        // the child to forward its hook to the context that created it.
         // AnArgumentlessDynamicFunctionIsRefusedInARealmThatForbidsGuestEvaluation and
-        // ShadowRealmEvaluatesNothingInARealmThatForbidsGuestEvaluation pin both routes.
+        // ShadowRealmEvaluatesNothingInARealmThatForbidsGuestEvaluation pin both routes;
+        // JsealConformanceTests.GuestEvalRoutes pins every other route and that importValue is still
+        // the engine's unimplemented stub, which is what keeps SR-6 unreachable.
         //
         // Replacing the eval and Function globals was considered and rejected: Function.prototype
         // .constructor reaches the compiler without either binding, so the stub would be a fence with
@@ -145,6 +163,7 @@ internal sealed partial class BroilerJsRealm : IJsRealm
         // invisible because nothing asked an adopted realm what it allowed.
         _allowGuestEval = options.AllowGuestEval;
         _forceStrictMode = options.ForceStrictMode;
+        _options = options;
         _ownsContext = false;
 
         _jobs = new JobQueue();
@@ -188,6 +207,9 @@ internal sealed partial class BroilerJsRealm : IJsRealm
     /// <inheritdoc />
     public string EngineName => _provider.Name;
 
+    /// <summary>The source of a module this realm's map loaded, by internal name, or null.</summary>
+    internal string? ModuleSourceFor(string internalName) => _moduleMap?.SourceFor(internalName);
+
     /// <summary>The engine's realm, for the provider's own files.</summary>
     internal JSContext Context => _context;
 
@@ -198,6 +220,9 @@ internal sealed partial class BroilerJsRealm : IJsRealm
             return;
 
         _disposed = true;
+
+        // A map settles nothing once its realm is gone; it only abandons its loads.
+        _moduleMap?.DisposeWithRealm();
 
         // Jobs queued but never drained belong to a realm that is going away; running them now would
         // execute page script against a document the host has already finished with.
@@ -244,6 +269,9 @@ internal sealed partial class BroilerJsRealm : IJsRealm
     private RealmScope Enter()
     {
         ThrowIfDisposed();
+        if (_moduleHostCalls != 0)
+            ThrowIfInModuleHost();
+
         return new RealmScope(_context, _ownsContext ? _pump : null);
     }
 

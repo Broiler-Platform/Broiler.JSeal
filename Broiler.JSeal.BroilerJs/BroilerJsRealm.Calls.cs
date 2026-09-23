@@ -10,9 +10,13 @@ namespace Broiler.JSeal.BroilerJs;
 /// <summary>
 /// <see cref="IJsCalls"/>: calling into JavaScript, and raising a JavaScript error from host code.
 /// </summary>
-internal sealed partial class BroilerJsRealm
+internal partial class BroilerJsRealm
 {
     /// <inheritdoc />
+    /// <remarks>
+    /// A value whose handle is not a function is refused before the engine is asked, with the
+    /// realm's <c>TypeError</c> carried by a <see cref="JsEngineException"/>.
+    /// </remarks>
     public JsValue Invoke(JsValue function, JsValue thisValue, ReadOnlySpan<JsValue> arguments = default)
     {
         using var scope = Enter();
@@ -22,6 +26,13 @@ internal sealed partial class BroilerJsRealm
 
         try
         {
+            // The handle's kind is the engine's callability predicate (BroilerJsMarshal.Wrap), and it
+            // is checked before the engine sees the call: InvokeFunction runs a Proxy's apply trap
+            // whether or not its target is callable, so a noncallable Proxy with one answered the
+            // trap's value instead of the TypeError ECMAScript's Call raises.
+            if (!function.IsFunction)
+                throw JSEngine.NewTypeError("the value passed to Invoke is not a function");
+
             return BroilerJsMarshal.Wrap(target.InvokeFunction(in call));
         }
         catch (JSException engineException)
@@ -47,6 +58,10 @@ internal sealed partial class BroilerJsRealm
 
         try
         {
+            // A noncallable value is never a constructor; refused the way Invoke refuses it.
+            if (!constructor.IsFunction)
+                throw JSEngine.NewTypeError("the value passed to Construct is not a constructor");
+
             return BroilerJsMarshal.Wrap(target.CreateInstance(in call));
         }
         catch (JSException engineException)
@@ -145,10 +160,22 @@ internal sealed partial class BroilerJsRealm
     /// message loses what the page said. The engine exception stays as the inner one, so a diagnostic
     /// that wants the CLR frames can still reach them.
     /// </remarks>
-    internal static JsEngineException Translate(JSException engineException) =>
-        new(engineException.Message, BroilerJsMarshal.Wrap(engineException.Error), engineException)
+    /// <param name="engineException">The engine's exception.</param>
+    /// <param name="sourceLabel">The selected identity when the throw escaped a source member.</param>
+    /// <param name="source">The text that member evaluated, which a reported line must refer to.</param>
+    internal static JsEngineException Translate(
+        JSException engineException, string? sourceLabel = null, string? source = null)
+    {
+        var trace = engineException.JSStackTrace?.ToString();
+
+        return new(engineException.Message, BroilerJsMarshal.Wrap(engineException.Error), engineException)
         {
-            ScriptStackTrace = engineException.JSStackTrace?.ToString(),
+            ScriptStackTrace = trace,
+            SourceLabel = sourceLabel,
+            SourceLine = sourceLabel is null || source is null
+                ? null
+                : CompileFailureLine(engineException.Message, trace, sourceLabel, source),
         };
+    }
 }
 

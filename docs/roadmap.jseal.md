@@ -1,7 +1,8 @@
 # JSeal correctness and maintenance slices
 
-[Roadmap index](roadmap.md). J00 and J02-J14 are **complete**. J01 is **implemented; Linux validation pending**.
-All other slices are **not started**. Priority: P1 = fix first;
+[Roadmap index](roadmap.md). J00, J02-J16, J18 and J19 are **complete**. J01 is **implemented; Linux
+validation pending**. J17 is **partial** (its last item waits for a VM release). Follow-up audits
+outside the numbered slices are listed at the end. Priority: P1 = fix first;
 P2 = correctness or enabling work; P3 = maintenance or optimization. Dependencies name work in
 this plan, not additional approval steps.
 
@@ -373,6 +374,15 @@ this plan, not additional approval steps.
 
 ## J15 — Restore useful nullable diagnostics in contracts
 
+- **Status:** Complete. With every inherited suppression lifted, the contracts produced no nullable,
+  CS9113, CA1416, CA2255 or SYSLIB0013 diagnostics, so the reference-free contracts now inherit no
+  repository `NoWarn` entry and promote `nullable` warnings to errors. The audit fixed two
+  annotation/documentation mismatches: `IJsRealmAdoption.TryAdopt` gained the `[NotNullWhen(true)]`
+  its documentation already promised, and the `TryGetArrayBufferBytes` documentation now says null
+  on false, as both providers and the annotation do (its missing parameter tag was added). A
+  [before/after public API comparison](../diagnostics/J15/README.md) shows exactly that one
+  source- and binary-compatible attribute change. A build control showed an injected nullable
+  violation fails the contracts build.
 - **Owner / priority:** JSeal contracts; P3.
 - **Prerequisites:** None.
 - **Work:** Audit inherited global warning suppressions against the reference-free contracts
@@ -384,6 +394,16 @@ this plan, not additional approval steps.
 
 ## J16 — Narrow nullable suppressions in providers
 
+- **Status:** Complete. The nullable family (CS8600-CS8767) is no longer suppressed anywhere; both
+  providers, the tests and the diagnostic projects build with zero warnings in Release and
+  Release-VM. Enabling it surfaced four diagnostics: `BroilerJsEngineProvider.TryAdopt` now carries
+  the J15 contract attribute; `VmRealm`'s exotic delete trap handles the pinned VM package's
+  unannotated `JsHostValue.AsString()` with a local pattern match instead of a suppression; a test
+  probe reports non-string results by kind. No engine null became Undefined and no observable null
+  behaviour changed. The diagnostics were few enough to take in one change rather than per family.
+  Follow-up polish removed the now-redundant null-forgiving operators and the unused CS9113, CA1416
+  and SYSLIB0013 entries; the global `NoWarn` list now holds only CA2255, which the providers'
+  registration module initializers need (removing it raises four warnings).
 - **Owner / priority:** JSeal providers; P3.
 - **Prerequisites:** J15 and settled changes from J06-J11.
 - **Work:** Enable diagnostic families incrementally per provider, distinguish engine annotation
@@ -396,6 +416,22 @@ this plan, not additional approval steps.
 
 ## J17 — Make source labels and DocumentUrl meaningful
 
+- **Status:** Partial; the remaining item waits on a Broiler.VM release. Each evaluation selects one
+  source identity with `JsRealmOptions.SourceLabelFor`: a non-blank label, else a non-blank
+  `DocumentUrl`, else `anonymous`. `DocumentUrl` is retained and documented as that fallback only;
+  it is not used for module resolution, caching, origin checks or permission, and labels never
+  select strictness or permission. `JsEngineException` gains `SourceLabel`, `SourceLine` and
+  `SourceColumn`; both providers attach the label to guest throws and syntax errors. A reported
+  syntax-error line is the ECMAScript line in the supplied text or no line at all (each provider
+  withholds lines where its pinned front end is unreliable), and lines survive forced strictness.
+  [Source identity tests](../Broiler.JSeal.Tests/JsealConformanceTests.SourceIdentity.cs) keep
+  guaranteed metadata apart from provider-specific stack details. **Upstream:** Broiler.VM now has
+  `JsScriptUnit.SourceName`, the template/U+2028 front-end fixes and the script-goal route
+  `EvaluateScript`; the Broiler.JS working tree counts lone CR, U+2028 and U+2029 as line breaks and
+  reports unterminated tokens where scanning stopped. The prepared VM adoption
+  (`jseal-vm-next3-over-normal.patch`, validated on candidate `0.1.0-preview.4.local.7`) runs host
+  scripts through `EvaluateScript` with the selected label and removes `VmRealm.MayMiscountLines`;
+  the Broiler.JS line-withholding can go once a Broiler.JS package with the lexer fix is pinned.
 - **Owner / priority:** JSeal with a VM source-provider API dependency if needed; P2.
 - **Prerequisites:** J04. Design before implementation if the engine API lacks source metadata.
 - **Work:** Specify precedence between explicit source label and optional document URL, carry the
@@ -409,6 +445,22 @@ this plan, not additional approval steps.
 
 ## J18 — Specify capabilities and expose untested coverage
 
+- **Status:** Complete. [Capability
+  coverage](../Broiler.JSeal.Tests/JsealConformanceTests.Capabilities.cs) accounts for every flag
+  and provider. Each witness theory takes its rows from `EnginesDeclaring` for its own flag and
+  asserts the capability with `AssertHas`; the 25 silent `Lacks` early returns were removed.
+  Undeclared flags are reported as refusal rows (the contract's `JsCapabilityUnavailableException`
+  rule), absence-only rows for GlobalIsVariableScope and ReentrantHostCalls, or recorded-gap rows
+  for Modules and DynamicImport, which also appear as two skipped placeholder witnesses until I13; a
+  provider declaring either fails the suite. Meta-tests check that every witness exists and is
+  driven by its own flag and that every provider/flag pair is witnessed or refused exactly once. VM
+  builds assert the identities `{broiler-js, broiler-vm}` rather than a count; Release asserts
+  broiler-js alone. The enum's numeric values are pinned. The [guide](jseal.md) documents provider
+  ability versus realm permission (AllowGuestEval plus the VM provider's bridge checks) and decides
+  that same-realm structured clone needs its own flag on a new bit before any provider supports only
+  one half; I18 adopts it. BigInt support is a stated per-engine table, and broiler-vm's refusal is
+  asserted rather than skipped. Windows suites: Release 221 passed / 2 skipped, Release-VM 403
+  passed / 2 skipped.
 - **Owner / priority:** JSeal contracts/tests; P2.
 - **Prerequisites:** J00; coordinate with I09 and I18 before adding flags.
 - **Work:** Document provider ability versus realm permission. Map each advertised capability to an
@@ -424,6 +476,20 @@ this plan, not additional approval steps.
 
 ## J19 — Establish the package handoff gate
 
+- **Status:** Complete. [The package gate](../eng/package-consumer/README.md) extends the local-feed
+  consumer check. `eng/package-gate.mjs` holds the version rules as tested pure functions (NuGet
+  version grammar, case-insensitive prerelease labels, ranges, one version per engine family,
+  provider packages declaring exactly their own family, NuGet unification to the highest declared
+  floor, feed closure, byte-identical candidate archives); `node --test` runs 21 fixtures, and CI
+  runs them. `eng/test-package-consumer.ps1` runs BroilerJs, Vm and Both consumers, each in a fresh
+  process with its negative controls, gating before and after. An optional candidate lane
+  (`-CandidateFeed`, `-CandidateVersion`) evaluates an unpublished engine family in a temporary copy
+  with rewritten pins and a fresh package cache, then runs both configurations; default pins never
+  change and nothing is published. Under PowerShell 7.6.6 the pinned lane passed (5 graphs,
+  26 staged archives, 0 gate errors), and the candidate lane passed against a locally packed
+  Broiler.VM `0.1.0-preview.4-local.jseal.1` family built from the merged VM working tree, after
+  exposing and fixing two staging defects. Current-source comparisons remain a documented separate
+  lane (the retained J00 probes), not an automated one.
 - **Owner / priority:** JSeal integration/packaging; P2.
 - **Prerequisites:** J02-J03.
 - **Work:** Extend the local-feed consumer checks to a candidate set of upstream engine packages.
@@ -433,3 +499,71 @@ this plan, not additional approval steps.
   publishing externally. The eventual pin update is explicit and passes both configurations,
   consumer smoke tests, and package validation. Missing dependencies fail before release.
 - **Exclude:** Floating versions, opportunistic upgrades, and automatic publication.
+
+## Follow-up audits outside the numbered slices
+
+- **Guest-evaluation guard of the Broiler.JS provider (prompted by VM JSD-0030 SR-6), 2026-09-21.**
+  On the pinned Broiler.JavaScript `0.1.0-preview.1` package, a realm with `AllowGuestEval=false`
+  refuses every guest route to the compiler found: eval reached indirectly, each function kind's
+  constructor through prototypes, `call`/`apply`/`bind`/`Reflect`, ShadowRealm `evaluate` (direct,
+  indirect, subclassed, nested), promise jobs and async continuations; string timer callbacks throw
+  TypeError, no interop global exists and `import('clr')` is rejected.
+  [Guest-evaluation route tests](../Broiler.JSeal.Tests/JsealConformanceTests.GuestEvalRoutes.cs)
+  pin these. **Open upstream:** ShadowRealm child contexts do not forward the creator's evaluation
+  policy (SR-6); it is unreachable today only because `importValue` is an unimplemented stub, which
+  a test pins exactly so that any package changing it forces a new review. An upstream Broiler.JS
+  patch exists but is not landed or packaged. Handing a permissive realm's `eval`, `Function` or
+  ShadowRealm into a restricted realm grants compilation on Broiler.JS (the language asks the
+  callee's realm); Broiler.VM refuses the foreign handle.
+- **J05 follow-up.** `Invoke` and `Construct` on both providers now refuse a non-function handle with
+  the realm's TypeError before any Proxy trap runs. Guest-level calls of a noncallable Proxy with an
+  `apply` trap still run the trap on the pinned Broiler.JS engine; the Broiler.JS working tree now throws the
+  TypeError before any trap runs, and its key enumeration no longer invokes getters (the J09 follow-up),
+  but neither is packaged.
+- **Broiler.JS parser and intrinsic-prototype fixes (upstream, 2026-09-22).** Found while fixing
+  the J05/J09 engine defects. In the Broiler.JS working tree: a doubled quote no longer continues a
+  string (`'a''b'` is two literals); only commas separate arguments, object-literal definitions and
+  binding elements (`f(1
+2)`, `f(1,,2)`, `{a:1
+b:2}` and `[a b]` are SyntaxErrors, and an
+  identifier after a complete expression is no longer dropped silently); every built-in class records
+  its intrinsic constructor and prototype per realm, so engine-created objects, primitive lookups,
+  SpeciesConstructor defaults and `Promise.any`'s AggregateError no longer read a replaced global;
+  and line and column numbers are 1-based on every line (the DevTools projection reports 0-based
+  columns). Failing-first tests in the parser, built-in and debugger suites; the full suite passes
+  apart from the two time-zone-dependent tests that also fail on the base; pinned Test262
+  language/{expressions,statements,literals} 19697 -> 19705 of 20909 and 24 further language
+  directories 3305 -> 3307 of 3487, with no regressions. Not packaged. **JSeal impact:** once a
+  Broiler.JS package with these fixes is pinned, J17's Broiler.JS column reporting must be re-checked
+  against the consistent base. The two items left over, `(1,)` and the Temporal/Intl
+  namespace prototypes, were closed by the follow-ups below.
+- **`JsValue.Missing` handed to the VM (2026-09-22).** Found while refreshing the VM adoption: the VM
+  provider passed `Missing` arguments, property values and callback results to the engine as the
+  profile's own Missing marker, which it resolves to its uninitialised-binding marker, so a guest
+  reading such an argument threw a ReferenceError instead of seeing `undefined` - on the pinned VM
+  `0.1.0-preview.3` as well. `VmMarshal.Unwrap` now hands `Missing` over as `undefined`, as the
+  Broiler.JS provider always has; the shared case `MissingIsUndefinedWhereTheEngineNeedsAValue`
+  failed first on VM and passes on both engines.
+- **Broiler.JS follow-ups (upstream, 2026-09-22).** In the Broiler.JS working tree, not packaged: the
+  arrow cover grammar is strict (`(1,)`, `()`, `(...a)` without `=>`, a rest element with a trailing
+  comma or initializer, and parenthesized binding targets at any depth are SyntaxErrors); Temporal
+  and Intl objects and generator functions take the realm's intrinsics, and the intrinsic registry is
+  internal with first registration winning; the keyed Promise combinators and async disposal settle
+  on promise jobs (the Test262 "flakiness" was the host exiting first), `Promise.resolve` adopts
+  thenables, and `await using` takes one job per awaited resource. Full suite as before (only the two
+  time-zone tests fail); pinned Test262 language 19261 -> 19272 of 20386, intl402/Temporal/Promise/
+  generators/disposal 8806 -> 8861 of 8893, modules 1095 -> 1097 of 1667, no regressions. Open
+  upstream: a native `await` takes two jobs where the specification takes one, and `await using` in
+  async generators and its SuppressedError seeding predate this work.
+- **Broiler.JS async ordering (upstream, 2026-09-22).** In the Broiler.JS working tree, not packaged:
+  `await` follows the specification's steps and resumes in the reaction job (one job for a native
+  promise or a plain value; a thenable's `then` runs in a job), so an async function settles one
+  promise instead of one per await step; async generators use the same Await, queue their requests,
+  and `yield*` over an async iterator follows the specification; `for await` awaits values only for a
+  sync iterable; each `await using` disposal is the function's own Await, seeds the body error into
+  SuppressedError and records needsAwait for a null resource. Two tests that encoded the old
+  for-await unwrapping were corrected to the specification's result. `IJSDisposableStack` gains four
+  members, a breaking change for external implementers. Full suite 9739 -> 9767 passing (only the two
+  time-zone tests fail); pinned Test262 async/disposal lane 5903 -> 6012 of 6409, Promise/Async*/
+  DisposableStack built-ins 977 -> 992 of 1014, no regressions. Open: `Array.fromAsync` still steps
+  with the sync protocol.

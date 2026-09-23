@@ -118,8 +118,10 @@ internal sealed partial class VmRealm
                     // A deletion that reached the named hook with "7" would make this provider
                     // disagree with the other one about what a name is, which is worse than the gap
                     // they share.
-                    if (key.Kind is JsHostValueKind.String && !IsArrayIndex(key.AsString()))
-                        deleter.TryDeleteNamed(key.AsString());
+                    // AsString is null exactly when the key is not a String; the package does not
+                    // annotate that tie to Kind, so the pattern carries it instead of a '!'.
+                    if (key.AsString() is { } name && !IsArrayIndex(name))
+                        deleter.TryDeleteNamed(name);
 
                     // The ordinary deletion runs either way and its answer is the deletion's answer,
                     // which is also what keeps the proxy's own invariant satisfied. It forwards
@@ -272,6 +274,17 @@ internal sealed partial class VmRealm
     /// <c>APageThatRewritesTypedArrayLengthCannotChangeWhatTheHostReads</c> is that case, and it
     /// failed before this line said <c>join</c>.
     /// </para>
+    /// <para>
+    /// <b>Each chunk's view is constructed over the buffer, not cut from a whole-buffer view with
+    /// <c>subarray</c>.</b> <c>subarray</c> builds its result through the species protocol: it reads
+    /// the view's <c>constructor</c> and then that constructor's <c>Symbol.species</c>, and a page
+    /// may redefine either, so the pinned intrinsic would still run page code inside this step and
+    /// render whatever view the page answered - other bytes, or more of them than the chunk, which
+    /// overran <c>read</c>. Constructing the pinned <c>Uint8Array</c> with (buffer, offset, length)
+    /// reads only <c>Uint8Array.prototype</c>, which is neither writable nor configurable.
+    /// <c>APageThatRedefinesTypedArraySpeciesCannotChangeWhatTheHostReads</c> is that case, and it
+    /// failed against a profile whose <c>subarray</c> honours species.
+    /// </para>
     /// </remarks>
     public bool TryGetArrayBufferBytes(JsValue value, [NotNullWhen(true)] out byte[]? bytes)
     {
@@ -307,16 +320,16 @@ internal sealed partial class VmRealm
                 return [];
 
             var read = new byte[length];
-            var view = realm.Construct(_bridge.Uint8Array, [candidate]);
 
             for (var offset = 0; offset < length; offset += TransferChunk)
             {
                 var end = Math.Min(offset + TransferChunk, length);
 
-                var part = realm.Invoke(
-                    _bridge.TypedArraySubarray,
-                    view,
-                    [JsHostValue.Number(offset), JsHostValue.Number(end)]);
+                // Constructed, not cut with subarray: subarray asks the view for its constructor and
+                // that for Symbol.species, both of which a page may redefine - see the remarks.
+                var part = realm.Construct(
+                    _bridge.Uint8Array,
+                    [candidate, JsHostValue.Number(offset), JsHostValue.Number(end - offset)]);
 
                 var text = realm.Invoke(_bridge.TypedArrayJoin, part, [Separator]).AsString()
                     ?? string.Empty;
@@ -408,6 +421,23 @@ internal sealed partial class VmRealm
         _ = VmMarshal.Unwrap(value);
 
         return value.AsBoolean;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The handle's operator, after both handles pass the foreign-engine check: this profile has no
+    /// BigInt, the one kind the operator cannot decide, and <see cref="VmMarshal.Unwrap"/> refuses a
+    /// BigInt handle, which cannot have come from one of its realms, as it does for
+    /// <see cref="ToBoolean"/>. <see cref="JsValue.Missing"/> is taken as <c>undefined</c>, as the
+    /// contract says.
+    /// </remarks>
+    public bool IsStrictlyEqual(JsValue left, JsValue right)
+    {
+        ThrowIfDisposed();
+        _ = VmMarshal.Unwrap(left);
+        _ = VmMarshal.Unwrap(right);
+
+        return (left.IsMissing ? JsValue.Undefined : left) == (right.IsMissing ? JsValue.Undefined : right);
     }
 
     private const int InlineArgumentCapacity = 8;

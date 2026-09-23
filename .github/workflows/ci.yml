@@ -53,8 +53,8 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Test preview version selection
-        run: node --test eng/resolve-preview-version.test.mjs
+      - name: Test preview version selection and package gate rules
+        run: node --test eng/resolve-preview-version.test.mjs eng/package-gate.test.mjs
 
       - name: Build (Release)
         run: |
@@ -78,6 +78,7 @@ jobs:
       - name: Test (Release-VM)
         run: bash ./eng/run-tests.sh Release-VM
 
+      # Pinned lane of the J19 gate: BroilerJs, Vm and Both consumers plus version-family rules.
       - name: Test isolated package consumers
         shell: pwsh
         run: ./eng/test-package-consumer.ps1 -Version $env:PACKAGE_VERSION

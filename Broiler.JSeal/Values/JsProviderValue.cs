@@ -27,6 +27,13 @@ public static class JsProviderValue
         JsValue.FromReference(JsValueKind.Symbol, reference ?? throw new ArgumentNullException(nameof(reference)));
 
     /// <summary>Wraps an engine BigInt.</summary>
+    /// <remarks>
+    /// The reference must denote one integer for as long as the handle lives, because
+    /// <see cref="JsValue"/>'s operator treats two handles with one reference as one value; it need
+    /// not be canonical. A provider implements <see cref="IJsValues.ToBoolean"/> and
+    /// <see cref="IJsValues.IsStrictlyEqual"/> for the handles it mints and refuses any other
+    /// engine's with <see cref="JsEngineException"/>.
+    /// </remarks>
     public static JsValue BigInt(object reference) =>
         JsValue.FromReference(JsValueKind.BigInt, reference ?? throw new ArgumentNullException(nameof(reference)));
 

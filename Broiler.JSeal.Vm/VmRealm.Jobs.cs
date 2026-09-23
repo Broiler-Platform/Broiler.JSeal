@@ -118,7 +118,10 @@ internal sealed partial class VmRealm
     /// </remarks>
     private void Settle(JsHostValue settler, JsValue value)
     {
-        var argument = VmMarshal.Unwrap(value);
+        // Missing is not a language value: passed on, it reaches the promise as the engine's
+        // uninitialised-binding marker, and every reaction then reads a hole. The contract's
+        // "no value" is undefined, as on the other provider.
+        var argument = value.IsMissing ? JsHostValue.Undefined : VmMarshal.Unwrap(value);
 
         InStep(realm => realm.Invoke(settler, JsHostValue.Undefined, [argument]));
     }
