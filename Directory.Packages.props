@@ -4,16 +4,14 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Broiler.JS engine packages for Broiler.JSeal.BroilerJs -->
-    <PackageVersion Include="Broiler.JavaScript.BuiltIns" Version="0.1.0-preview.3" />
-    <PackageVersion Include="Broiler.JavaScript.Globals" Version="0.1.0-preview.3" />
-    <PackageVersion Include="Broiler.JavaScript.Modules" Version="0.1.0-preview.3" />
-    <PackageVersion Include="Broiler.JavaScript.Storage" Version="0.1.0-preview.3" />
-
+    <PackageVersion Include="Broiler.JavaScript.BuiltIns" Version="0.1.0-preview.5" />
+    <PackageVersion Include="Broiler.JavaScript.Globals" Version="0.1.0-preview.5" />
+    <PackageVersion Include="Broiler.JavaScript.Modules" Version="0.1.0-preview.5" />
+    <PackageVersion Include="Broiler.JavaScript.Storage" Version="0.1.0-preview.5" />
     <!-- Broiler.VM engine packages for Broiler.JSeal.Vm -->
-    <PackageVersion Include="Broiler.VM.Profile.JavaScript" Version="0.1.0-preview.4" />
-    <PackageVersion Include="Broiler.VM.Profile.JavaScript.Compiler" Version="0.1.0-preview.4" />
-    <PackageVersion Include="Broiler.VM.Runtime" Version="0.1.0-preview.4" />
-
+    <PackageVersion Include="Broiler.VM.Profile.JavaScript" Version="0.1.0-preview.5" />
+    <PackageVersion Include="Broiler.VM.Profile.JavaScript.Compiler" Version="0.1.0-preview.5" />
+    <PackageVersion Include="Broiler.VM.Runtime" Version="0.1.0-preview.5" />
     <!-- Test dependencies for Broiler.JSeal.Tests -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageVersion Include="xunit" Version="2.5.3" />
