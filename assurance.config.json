@@ -1,0 +1,25 @@
+{
+  "$comment": "Per-declaration assurance for Broiler.JSeal. Product projects only: the three packable libraries (the reference-free contracts and the two engine providers). Broiler.JSeal.Tests, the diagnostics/ probes and eng/package-consumer do not ship and are not listed, so they are not covered. No source here is third-party-derived (the component was extracted from Broiler.HtmlBridge and uses Broiler.JS and Broiler.VM only as NuGet packages), so there are no spdxOverrides. HUMAN_REVIEW.md is a hand-written review record and stays as it is; the generated per-unit record goes to HUMAN_REVIEW.units.md.",
+  "schema": 1,
+  "component": "Broiler.JSeal",
+  "projects": [
+    "Broiler.JSeal/Broiler.JSeal.csproj",
+    "Broiler.JSeal.BroilerJs/Broiler.JSeal.BroilerJs.csproj",
+    "Broiler.JSeal.Vm/Broiler.JSeal.Vm.csproj"
+  ],
+  "exclude": [],
+  "exemptionPredicate": "owning-component",
+  "spdx": {
+    "copyright": [ "2026 Broiler Platform contributors" ],
+    "license": "Apache-2.0"
+  },
+  "spdxOverrides": [],
+  "artefacts": {
+    "report": "CODE-ASSURANCE.md",
+    "humanReview": "HUMAN_REVIEW.units.md",
+    "manifest": "assurance.manifest.json"
+  },
+  "forbidDirectives": false,
+  "forgeryVocabulary": "narrow",
+  "regenerateCommand": "dotnet run --project Broiler.Code/src/Broiler.Code.Review.Cli -c Release -- assurance generate --root Broiler.JSeal"
+}
