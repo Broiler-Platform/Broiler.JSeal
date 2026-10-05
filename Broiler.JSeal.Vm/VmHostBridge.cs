@@ -100,6 +100,17 @@ internal class VmHostBridge : IJsHostSurface
     internal JsHostValue ReflectDelete { get; private set; }
 
     /// <summary>
+    /// The realm's <c>Reflect.set</c>, taken at the same moment and for the same reason.
+    /// </summary>
+    /// <remarks>
+    /// The forwarder an indexed-write <c>set</c> trap needs for every write it does not take: a named
+    /// one, which must still reach the host exotic's own named setter, a symbol-keyed one, and one to
+    /// an object that only inherits from the proxy - with the receiver it was given, which no member
+    /// of the host surface takes.
+    /// </remarks>
+    internal JsHostValue ReflectSet { get; private set; }
+
+    /// <summary>
     /// The realm's binary intrinsics, taken at the same moment and for the same reason as
     /// <see cref="Promise"/>: <c>ArrayBuffer</c>, <c>Uint8Array</c>, the <c>byteLength</c> getter off
     /// <c>ArrayBuffer.prototype</c>, and the two functions the bulk transfer uses.
@@ -175,7 +186,9 @@ internal class VmHostBridge : IJsHostSurface
         Promise = realm.GetProperty(realm.Global, "Promise");
         Proxy = realm.GetProperty(realm.Global, "Proxy");
         Eval = realm.GetProperty(realm.Global, "eval");
-        ReflectDelete = realm.GetProperty(realm.GetProperty(realm.Global, "Reflect"), "deleteProperty");
+        var reflect = realm.GetProperty(realm.Global, "Reflect");
+        ReflectDelete = realm.GetProperty(reflect, "deleteProperty");
+        ReflectSet = realm.GetProperty(reflect, "set");
         CaptureBinary(realm);
         HasClone = ProbeClone(realm);
     }

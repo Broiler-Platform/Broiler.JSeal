@@ -55,52 +55,100 @@ internal partial class VmRealm
             completion.Target = exotic;
 
             return VmMarshal.Wrap(
-                handler is IJsExoticDelete deleter ? Deleting(realm, exotic, deleter) : exotic);
+                handler is IJsExoticDelete or IJsExoticIndexedSet
+                    ? Trapped(realm, exotic, handler as IJsExoticDelete, handler as IJsExoticIndexedSet)
+                    : exotic);
         });
     }
 
     /// <summary>
-    /// The same host exotic behind a proxy whose one trap routes a named deletion to the handler.
+    /// The same host exotic behind a proxy whose traps route a named deletion, an indexed write, or
+    /// both, to the handler.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>The profile's host-object surface has no delete hook, and this is the route around that
-    /// rather than a change to the engine.</b> It is the lesson <c>NewPromise</c> recorded applied
-    /// to a second intrinsic: a thing the guest already has is reachable across the host surface
-    /// without a new member on it. Three ordinary crossings - the constructor read at realm
-    /// creation, a trap minted here, one construct - and no evaluation.
+    /// <b>The profile's host-object surface has no indexed write hook, and offered no delete hook
+    /// when this was written; this is the route around that rather than a change to the engine.</b>
+    /// It is the lesson <c>NewPromise</c> recorded applied to a second intrinsic: a thing the guest
+    /// already has is reachable across the host surface without a new member on it. Three ordinary
+    /// crossings - the constructor read at realm creation, the traps minted here, one construct -
+    /// and no evaluation.
     /// </para>
     /// <para>
-    /// <b>ONE trap, and only for a handler that declares a deletion.</b> Every operation on a proxy
-    /// costs a property read on the trap object plus a charge before it forwards, which is exactly
-    /// the price the profile weighed when it made its host exotic a subclass instead of a proxy. So
-    /// the two storage areas pay it and the live collections - whose indexed reads are the hottest
-    /// path a page has - are minted exactly as they were. This is the whole reason
-    /// <see cref="IJsExoticDelete"/> is a second interface: a provider that could not ask the
-    /// question at mint time would have to wrap everything.
+    /// <b>A trap only for what the handler declares.</b> Every operation on a proxy costs a property
+    /// read on the trap object plus a charge before it forwards, which is exactly the price the
+    /// profile weighed when it made its host exotic a subclass instead of a proxy. So the storage
+    /// areas and the option lists pay it and the other live collections - whose indexed reads are
+    /// the hottest path a page has - are minted exactly as they were. This is the whole reason
+    /// <see cref="IJsExoticDelete"/> and <see cref="IJsExoticIndexedSet"/> are separate interfaces:
+    /// a provider that could not ask the question at mint time would have to wrap everything.
     /// </para>
     /// <para>
-    /// <b>The trap is the only one defined, so every other operation forwards to the target
-    /// unchanged</b> - reads, writes, enumeration, descriptors and the prototype all reach the host
-    /// exotic through the proxy's own missing-trap paths, which forward the internal method rather
-    /// than an unchecked one. That includes the bridge's own member installation, which reaches the
-    /// target while the realm is installing and is correctly not offered to the handler.
+    /// <b>Every operation without a trap forwards to the target unchanged</b> - reads, enumeration,
+    /// descriptors and the prototype all reach the host exotic through the proxy's own missing-trap
+    /// paths, which forward the internal method rather than an unchecked one. That includes the
+    /// bridge's own member installation, which reaches the target while the realm is installing and
+    /// is correctly not offered to the handler.
     /// </para>
     /// </remarks>
-    private JsHostValue Deleting(JsHostRealm realm, JsHostValue exotic, IJsExoticDelete deleter)
+    private JsHostValue Trapped(
+        JsHostRealm realm, JsHostValue exotic, IJsExoticDelete? deleter, IJsExoticIndexedSet? setter)
     {
         var constructor = _bridge.Proxy;
         var forward = _bridge.ReflectDelete;
+        var forwardSet = _bridge.ReflectSet;
 
         if (constructor.Kind is not JsHostValueKind.Function ||
-            forward.Kind is not JsHostValueKind.Function)
+            forward.Kind is not JsHostValueKind.Function ||
+            forwardSet.Kind is not JsHostValueKind.Function)
         {
             throw new JsEngineException(
-                "the realm had no Proxy constructor or no Reflect.deleteProperty when it was created, "
-                    + "so this provider cannot complete a deletion on an exotic object");
+                "the realm had no Proxy constructor, Reflect.deleteProperty or Reflect.set when it was created, "
+                    + "so this provider cannot complete a deletion or an indexed write on an exotic object");
         }
 
         var traps = realm.NewObject();
+
+        // The proxy the guest holds, once it exists: the set trap below offers the handler a write to
+        // the object itself only, and a write that arrives with another receiver is one to an object
+        // that merely inherits from it.
+        var proxy = JsHostValue.Undefined;
+
+        if (setter is not null)
+        {
+            realm.DefineValue(
+                traps,
+                "set",
+                realm.NewMethod(
+                    "set",
+                    (asked, _, arguments) =>
+                    {
+                        var target = arguments.Length > 0 ? arguments[0] : JsHostValue.Undefined;
+                        var key = arguments.Length > 1 ? arguments[1] : JsHostValue.Undefined;
+                        var value = arguments.Length > 2 ? arguments[2] : JsHostValue.Undefined;
+                        var receiver = arguments.Length > 3 ? arguments[3] : JsHostValue.Undefined;
+
+                        // AN INDEX, NEVER A NAME AND NEVER A SYMBOL: the named half is the host
+                        // exotic's own TrySetNamed, which the forward below still reaches.
+                        if (key.AsString() is { } name &&
+                            TryParseArrayIndex(name, out var index) &&
+                            receiver.Equals(proxy) &&
+                            Raising(asked, () => setter.TrySetIndex(index, VmMarshal.Wrap(value))))
+                        {
+                            return JsHostValue.Boolean(true);
+                        }
+
+                        return JsHostValue.Boolean(
+                            asked.Invoke(forwardSet, JsHostValue.Undefined, [target, key, value, receiver]).AsBoolean());
+                    },
+                    length: 4));
+        }
+
+        if (deleter is null)
+        {
+            proxy = realm.Construct(constructor, [exotic, traps]);
+            return proxy;
+        }
 
         realm.DefineValue(
             traps,
@@ -121,7 +169,7 @@ internal partial class VmRealm
                     // AsString is null exactly when the key is not a String; the package does not
                     // annotate that tie to Kind, so the pattern carries it instead of a '!'.
                     if (key.AsString() is { } name && !IsArrayIndex(name))
-                        deleter.TryDeleteNamed(name);
+                        Raising(asked, () => deleter.TryDeleteNamed(name));
 
                     // The ordinary deletion runs either way and its answer is the deletion's answer,
                     // which is also what keeps the proxy's own invariant satisfied. It forwards
@@ -133,7 +181,8 @@ internal partial class VmRealm
                 },
                 length: 2));
 
-        return realm.Construct(constructor, [exotic, traps]);
+        proxy = realm.Construct(constructor, [exotic, traps]);
+        return proxy;
     }
 
     /// <summary>
@@ -144,8 +193,34 @@ internal partial class VmRealm
     /// upper-bound rules are visible: <c>"007"</c> and <c>"4294967295"</c> are names, <c>"7"</c> is
     /// an index, and a parse that accepted either would silently widen what reaches the handler.
     /// </remarks>
-    private static bool IsArrayIndex(string key)
+    /// <summary>
+    /// Runs a handler's hook inside a trap, so that what it raises reaches the guest as what it is.
+    /// </summary>
+    /// <remarks>
+    /// A trap is a host function the profile calls directly, not one minted through
+    /// <see cref="NewMethod"/>, so it does not pass through the trampoline that turns a
+    /// <see cref="IJsCalls.Error"/> into the guest's throw. Without this, a handler refusing a value
+    /// threw past the page's <c>try</c> and out of the evaluation.
+    /// </remarks>
+    private static bool Raising(JsHostRealm realm, Func<bool> hook)
     {
+        try
+        {
+            return hook();
+        }
+        catch (JsEngineException raised) when (!raised.Thrown.IsMissing)
+        {
+            throw realm.Throw(VmMarshal.Unwrap(raised.Thrown));
+        }
+    }
+
+    private static bool IsArrayIndex(string key) => TryParseArrayIndex(key, out _);
+
+    /// <summary>The same question, answering the index when the key is one.</summary>
+    private static bool TryParseArrayIndex(string key, out uint index)
+    {
+        index = 0;
+
         if (key.Length is 0 or > 10)
             return false;
 
@@ -162,7 +237,11 @@ internal partial class VmRealm
             value = (value * 10) + (ulong)(digit - '0');
         }
 
-        return value < uint.MaxValue;
+        if (value >= uint.MaxValue)
+            return false;
+
+        index = (uint)value;
+        return true;
     }
 
     /// <inheritdoc />

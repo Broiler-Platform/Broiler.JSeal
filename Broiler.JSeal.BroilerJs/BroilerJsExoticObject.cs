@@ -49,6 +49,7 @@ internal sealed class BroilerJsExoticObject : JSObject
 {
     private readonly IJsExotic _handler;
     private readonly IJsExoticDelete? _deleter;
+    private readonly IJsExoticIndexedSet? _indexedSetter;
     private readonly HashSet<uint> _materialized = [];
     private uint _indexedLength;
 
@@ -61,6 +62,9 @@ internal sealed class BroilerJsExoticObject : JSObject
         // the object, and null here is what makes the override below free for the five handlers
         // that never delete.
         _deleter = handler as IJsExoticDelete;
+
+        // The same for an indexed write: only an object with an indexed setter is offered one.
+        _indexedSetter = handler as IJsExoticIndexedSet;
     }
 
     /// <summary>
@@ -159,8 +163,20 @@ internal sealed class BroilerJsExoticObject : JSObject
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// An indexed setter is asked first, and only for a write to this object itself; see
+    /// <see cref="IJsExoticIndexedSet"/>. What it takes changes the collection, and the next lookup's
+    /// <see cref="Sync"/> brings the slots up to date.
+    /// </remarks>
     public override bool SetValue(uint key, JSValue value, JSValue receiver, bool throwError = true)
     {
+        if (_indexedSetter is not null &&
+            ReferenceEquals(receiver, this) &&
+            _indexedSetter.TrySetIndex(key, BroilerJsMarshal.Wrap(value)))
+        {
+            return true;
+        }
+
         var written = base.SetValue(key, value, receiver, throwError);
         if (written && ReferenceEquals(receiver, this))
             _materialized.Remove(key);
@@ -179,6 +195,11 @@ internal sealed class BroilerJsExoticObject : JSObject
     /// <inheritdoc />
     protected override bool SetValue(KeyString key, JSValue value, JSValue receiver, bool throwError = true)
     {
+        // A numeric name is an index to an indexed setter, as it is to the engine's own storage; a
+        // host write by name ("0") reaches here rather than the indexed overload.
+        if (_indexedSetter is not null && key.Metadata is { IsArrayIndex: true } metadata)
+            return SetValue(metadata.ArrayIndex, value, receiver, throwError);
+
         if (_handler.TrySetNamed(key.ToString(), BroilerJsMarshal.Wrap(value)))
             return true;
 

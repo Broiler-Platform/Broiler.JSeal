@@ -3,7 +3,7 @@
 [Roadmap index](roadmap.md). I09 and I11 are **complete**. The VM halves of I01, I03, I05, I07,
 I11 and I12, and I14-I17, are released in Broiler.VM `0.1.0-preview.4`, pinned since 2026-09-23.
 JSeal has adopted I11, I12's VM routing and I18's VM clone against that release; I02, I04, I06 and
-I08 are still prepared only against a local candidate. I10, I12 and I18 are **partial**; I13 is not
+I08 are still prepared only against a local candidate. I10, I12 and I18 are **partial**; I13 and I19 are not
 started. These slices concern the host surface
 and JSeal contracts; missing adapter behavior does not imply the VM lacks the underlying language
 feature. Native host API additions map primarily to VM JSP-10; modules to JSW-8; job integration
@@ -396,3 +396,19 @@ unavailable API reference with an unrelated adapter fix.
   second-thread transport.
 - **Exclude:** Enabling WorkerRealms just because basic object copying works, or promising a full
   browser Worker implementation from the realm capability alone.
+
+## I19 — Add a VM host exotic indexed-set hook
+
+- **Status:** Not started. JSeal's `IJsExoticIndexedSet` (an indexed property setter, for
+  `HTMLOptionsCollection` and `HTMLSelectElement`) is served on the VM provider by a `set` trap on the
+  same internal `Proxy` I06 removes for deletion, with `Reflect.set` captured at realm creation for the
+  writes the handler declines. Until the VM offers a native hook, I06 can remove the `Proxy` only for
+  handlers that do not declare `IJsExoticIndexedSet`.
+- **Owner / prerequisites:** VM host API; the I05 shape (an optional interface on the exotic handler).
+- **Work:** Offer every array-index write whose receiver is the exotic object itself to an optional
+  handler interface, before the ordinary assignment, whose result decides whether it happens. Handler
+  exceptions translate like host function bodies.
+- **Accept:** JSeal's `ExoticIndexedSet` conformance cases pass on the VM provider without a `Proxy`;
+  a write through an inheriting object, `Object.defineProperty` and deletion are not offered; a guest
+  replacing `Proxy` or `Reflect.set` has no effect.
+- **Exclude:** Named setters, which `IJsExotic.TrySetNamed` already covers.
