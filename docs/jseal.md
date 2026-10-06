@@ -138,6 +138,28 @@ when the collection grows over them or shrinks past them. The JS provider tracks
 ownership; an explicit ordinary definition ends handler ownership. Deleting that ordinary override
 exposes the current handler entry if its index is still within the range.
 
+**`IJsExoticIndexedSet` takes an indexed write before the ordinary assignment.** It is for the objects
+WebIDL gives an indexed property setter, `HTMLOptionsCollection` and `HTMLSelectElement`: an
+array-index write to the object itself is offered to `TrySetIndex`, which may take it at any index --
+inside the range to replace an entry, at or past its end to add to the collection -- or decline it,
+and the ordinary assignment happens. A taken write leaves no ordinary property behind, which the next
+read would find before the handler. The handler refuses by throwing an exception from `Error` or
+`DomError`, and the script sees it in sloppy code too, because WebIDL converts the value before the
+setter runs. A write to an object that only inherits from this one, a deletion and
+`Object.defineProperty` are not offered. The Broiler.JS provider asks the handler in its exotic
+object's indexed write; the VM provider mints the object behind a `Proxy` whose `set` trap asks it --
+the `Proxy` the delete hook already uses -- because the VM host surface has no indexed write hook
+(I19 in the integration roadmap).
+
+**Not yet: what an indexed setter changes about the entries themselves.** WebIDL gives the indices of
+an object with an indexed setter `writable: true`, and its `[[Delete]]` answers false for an index in
+range -- a `TypeError` in strict code -- without taking anything away; Chromium does both for
+`select.options` (measured). JSeal still describes every handler entry as read-only,
+indexed setter or not, and lets a deletion of one take the ordinary path, which answers true and
+removes nothing. Both are this contract's to change, since the provider answers the descriptor and the
+deletion: the setter's declaration would make its entries writable, and an index in range would refuse
+deletion on both providers (J20 in the JSeal roadmap).
+
 **A failed job stops that drain and leaves later jobs queued.** The failed job has been removed;
 the next drain resumes with its successors, including jobs it enqueued before throwing. A guest
 throw is exposed as `JsEngineException`; an ordinary exception from a queued host `Action` propagates

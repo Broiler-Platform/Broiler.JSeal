@@ -500,6 +500,22 @@ this plan, not additional approval steps.
   consumer smoke tests, and package validation. Missing dependencies fail before release.
 - **Exclude:** Floating versions, opportunistic upgrades, and automatic publication.
 
+## J20 — Describe an indexed setter's entries as WebIDL does
+
+- **Status:** Not started. Found while adding `IJsExoticIndexedSet` (2026-10-05); see
+  [the contract notes](jseal.md).
+- **Owner / priority:** JSeal contracts; P3.
+- **Prerequisites:** None; on the VM provider the change sits in the indexed setter's `Proxy` until
+  I19 replaces it.
+- **Work:** For a handler that declares `IJsExoticIndexedSet`, describe each entry in its range as
+  `writable: true` (still enumerable and configurable), and answer a `[[Delete]]` of an index in range
+  with `false` -- a `TypeError` in strict code -- without taking anything away, on both providers.
+  Chromium does both for `select.options` (measured). An index out of range deletes as it does now.
+- **Accept:** Conformance cases on both providers: an entry's descriptor is writable,
+  `delete collection[0]` is false in sloppy code and throws in strict code, the entry is still there,
+  and a handler without an indexed setter keeps read-only entries.
+- **Exclude:** Named properties, and handlers without an indexed setter.
+
 ## Follow-up audits outside the numbered slices
 
 - **Guest-evaluation guard of the Broiler.JS provider (prompted by VM JSD-0030 SR-6), 2026-09-21.**

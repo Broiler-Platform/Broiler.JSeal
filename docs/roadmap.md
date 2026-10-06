@@ -10,7 +10,7 @@ implemented, and D01-D04 are proposed decision records; that VM work is local va
 not in any released package. The Broiler.JS working tree has the module semantics and core fixes I10
 needs, also unreleased. JSeal adoption of the VM work (I02, I04, I06, I08, J17's last item, I11,
 I12's VM routing, I18's VM clone and B06's VM half) is prepared and validated against a local VM
-candidate but waits for a VM release. Remaining: I13, I18's WorkerRealms, and merging the prepared
+candidate but waits for a VM release. Remaining: I13, I18's WorkerRealms, I19, and merging the prepared
 adoption (including B06's VM-dependent half) once a VM release exists. Nothing here has been
 published; the existing package baseline is `0.1.0-preview.1`.
 
@@ -43,10 +43,10 @@ refusal is preferable to a plausible wrong result, but does not count as impleme
 
 | Plan | Contents | Slice IDs |
 |---|---|---|
-| [JSeal correctness and maintenance](roadmap.jseal.md) | Reproduction, package composition, six confirmed defects, allocation reduction, contracts, diagnostics, documentation | J00-J19 |
+| [JSeal correctness and maintenance](roadmap.jseal.md) | Reproduction, package composition, six confirmed defects, allocation reduction, contracts, diagnostics, documentation | J00-J20 |
 | [VM semantic correctness](roadmap.vm-semantics.md) | Coercion order, object integrity, RegExp guards, arguments aliasing, species protocols, direct eval | V01-V15 |
 | [VM feature additions](roadmap.vm-features.md) | Float16, resizable buffers, Unicode, iterator helpers, modern library APIs, BigInt, deferred decisions | F01-F22, B01-B08, D01-D04 |
-| [Host and cross-repository integration](roadmap.integration.md) | Native VM host operations, adapter adoption, modules, structured clone, worker-realm capability | I01-I18 |
+| [Host and cross-repository integration](roadmap.integration.md) | Native VM host operations, adapter adoption, modules, structured clone, worker-realm capability | I01-I19 |
 
 These are work-item IDs local to this plan. They do not replace Broiler.VM's existing `JS-*`,
 `JSW-*`, or `JSP-*` milestone IDs, and do not change those milestones' status. Work in another
@@ -78,8 +78,10 @@ packaged provider exercised during the review. Never silently substitute one tar
 | An ordinary `undefined` property loses to an exotic named property | J08 |
 | Removing the default provider leaves default selection broken | J10 |
 | Suspected stale exotic indices when a handler withdraws a value | J09: resolve the sparse-index contract before changing it |
+| An indexed setter's entries are described read-only, and deleting one answers true | J20 |
 | VM binary transfers serialize bytes through guest arrays and strings | I01-I04 |
 | VM needs Proxy for host exotic deletion and guest constructors for promises | I05-I08 |
+| VM needs Proxy for a host exotic's indexed setter | I19 |
 | VM modules exist, but JSeal has no usable module-graph contract | I09-I13 |
 | VM lacks structured clone and worker-realm transfer through JSeal | I14-I18 |
 | VM implements several language protocols incorrectly | V01-V12 |

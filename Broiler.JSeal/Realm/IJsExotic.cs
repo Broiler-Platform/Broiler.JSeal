@@ -80,6 +80,47 @@ public interface IJsExotic
 }
 
 /// <summary>
+/// The indexed half of a host-completed write, for the objects WebIDL gives an indexed property
+/// setter: <c>HTMLOptionsCollection</c> and <c>HTMLSelectElement</c>, where
+/// <c>select.options[i] = option</c> replaces, appends or (with <c>null</c>) removes an option.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>The hook runs BEFORE the ordinary assignment, as <see cref="IJsExotic.TrySetNamed"/> does,</b>
+/// for an array-index key set on the object itself. An indexed setter takes every index: one inside
+/// the handler's range replaces an entry, one at or past its end adds to the collection, and an
+/// ordinary property must not appear in either case, because the next read would find it before
+/// the handler. Answering <see langword="false"/> declines, and the ordinary assignment happens.
+/// </para>
+/// <para>
+/// <b>A handler may refuse by throwing</b> an exception made by <see cref="IJsCalls.Error"/> or
+/// <see cref="IJsCalls.DomError"/>: WebIDL converts the value before the setter runs, so
+/// <c>options[0] = 'x'</c> is a <c>TypeError</c> in sloppy code as well as in strict code, and the
+/// script sees the error the handler raised.
+/// </para>
+/// <para>
+/// <b>Only a write reaches it.</b> Entries keep the descriptors <see cref="IJsExotic.TryGetIndex"/>
+/// gives them, a deletion of an index takes the ordinary path, and so does
+/// <c>Object.defineProperty</c>, which WebIDL would also route through the setter. A write to an
+/// object that merely inherits from this one is an ordinary write to that object, as WebIDL's
+/// [[Set]] has it, and is not offered here either.
+/// </para>
+/// <para>
+/// It is a separate contract for the reason <see cref="IJsExoticDelete"/> is: a provider whose
+/// engine has no indexed write hook has to express the object differently, and has to know that
+/// when it mints it.
+/// </para>
+/// </remarks>
+public interface IJsExoticIndexedSet
+{
+    /// <summary>
+    /// Takes an assignment to an array index of the object, or declines it so that the ordinary
+    /// assignment happens.
+    /// </summary>
+    bool TrySetIndex(uint index, JsValue value);
+}
+
+/// <summary>
 /// The deletion half of a host-completed lookup, for the one kind of object whose behaviour
 /// includes taking something away: a legacy platform object with a named deleter.
 /// </summary>
