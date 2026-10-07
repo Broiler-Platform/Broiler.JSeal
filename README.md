@@ -62,7 +62,7 @@ Pushes to main and pull requests build all libraries on Linux and Windows under 
 run isolated package consumers. The Windows job also packs and verifies the NuGet packages.
 
 Packages are published to nuget.org only, by the manually run `Publish` workflow (or a `v*` tag),
-which defaults to a dry run. The preview number is chosen automatically: one past the highest
+which always pushes; the no-push pack and consumer-restore check is CI's job. The preview number is chosen automatically: one past the highest
 `X.Y.Z-preview.N` of any shipping package on nuget.org or on the retired GitHub Packages feed, which
 is still read as version history so that no preview number is ever reused. Every dependency outside
 the release must already be on nuget.org; the workflow proves that with an isolated consumer restore

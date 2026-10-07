@@ -9,10 +9,6 @@ on:
         description: 'Optional preview.N (unused and at least the next preview). Empty selects automatically.'
         type: string
         default: ''
-      dry-run:
-        description: Validate and attach packages without pushing to nuget.org
-        type: boolean
-        default: true
   push:
     tags: ['v*']
 
@@ -38,8 +34,6 @@ jobs:
       packages: read
     outputs:
       version: ${{ steps.version.outputs.version }}
-    env:
-      DRY_RUN: ${{ github.event_name == 'push' && 'false' || inputs.dry-run }}
     steps:
       - name: Check out
         uses: actions/checkout@v7
@@ -52,7 +46,6 @@ jobs:
         with:
           node-version: '24'
       - name: Require a NuGet.org API key
-        if: env.DRY_RUN != 'true'
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_TOKEN }}
         run: |
@@ -79,7 +72,6 @@ jobs:
     needs: [version, validate]
     runs-on: ubuntu-latest
     env:
-      DRY_RUN: ${{ github.event_name == 'push' && 'false' || inputs.dry-run }}
       PACKAGE_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - name: Set up .NET
@@ -100,7 +92,6 @@ jobs:
       # command. --skip-duplicate makes a re-run after a partial push finish the remaining
       # packages instead of failing on the ones that already landed.
       - name: Push to nuget.org
-        if: env.DRY_RUN != 'true'
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_TOKEN }}
         run: >
@@ -113,11 +104,7 @@ jobs:
           {
             echo "### Broiler.JSeal $PACKAGE_VERSION"
             echo
-            if [ "$DRY_RUN" = "true" ]; then
-              echo 'Dry run: validated packages are attached; nothing was pushed.'
-            else
-              echo 'Published to nuget.org. New versions can take a few minutes to be indexed and listed.'
-            fi
+            echo 'Published to nuget.org. New versions can take a few minutes to be indexed and listed.'
             echo
             echo '```'
             ls -1 artifacts
