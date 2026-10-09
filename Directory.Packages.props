@@ -4,10 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Broiler.JS engine packages for Broiler.JSeal.BroilerJs -->
-    <PackageVersion Include="Broiler.JavaScript.BuiltIns" Version="0.1.0-preview.6" />
-    <PackageVersion Include="Broiler.JavaScript.Globals" Version="0.1.0-preview.6" />
-    <PackageVersion Include="Broiler.JavaScript.Modules" Version="0.1.0-preview.6" />
-    <PackageVersion Include="Broiler.JavaScript.Storage" Version="0.1.0-preview.6" />
+    <PackageVersion Include="Broiler.JavaScript.BuiltIns" Version="0.1.0-preview.7" />
+    <PackageVersion Include="Broiler.JavaScript.Globals" Version="0.1.0-preview.7" />
+    <PackageVersion Include="Broiler.JavaScript.Modules" Version="0.1.0-preview.7" />
+    <PackageVersion Include="Broiler.JavaScript.Storage" Version="0.1.0-preview.7" />
     <!-- Broiler.VM engine packages for Broiler.JSeal.Vm -->
     <PackageVersion Include="Broiler.VM.Profile.JavaScript" Version="0.1.0-preview.5" />
     <PackageVersion Include="Broiler.VM.Profile.JavaScript.Compiler" Version="0.1.0-preview.5" />
