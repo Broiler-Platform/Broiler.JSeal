@@ -1,6 +1,7 @@
 ﻿using System.Runtime.ExceptionServices;
 
 using Broiler.VM;
+using Broiler.VM.Abstractions;
 using Broiler.VM.Profile.JavaScript;
 
 namespace Broiler.JSeal.Vm;

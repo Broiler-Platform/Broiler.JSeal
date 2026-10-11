@@ -1,3 +1,5 @@
+using Broiler.VM;
+using Broiler.VM.Abstractions;
 using Broiler.VM.Profile.JavaScript;
 
 namespace Broiler.JSeal.Vm;
@@ -83,9 +85,9 @@ internal partial class VmRealm
 /// the gating option builds one.
 /// </summary>
 internal sealed class VmModuleRealm(
-    Broiler.VM.VmRuntime runtime,
-    Broiler.VM.VmVerifiedArtifact artifact,
-    Broiler.VM.VmInstance instance,
+    VmRuntime runtime,
+    VmVerifiedArtifact artifact,
+    VmInstance instance,
     VmModuleHostBridge bridge,
     VmSourceProvider sources,
     JsRealmOptions options,
