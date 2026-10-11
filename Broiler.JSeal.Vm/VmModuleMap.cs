@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 using Broiler.VM.Profile.JavaScript;
 using Broiler.VM.Profile.JavaScript.Compiler;
+using Broiler.VM.Profile.JavaScript.Format;
 
 namespace Broiler.JSeal.Vm;
 
@@ -203,16 +204,26 @@ internal sealed class VmModuleMap : IJsModuleMap
         else
             return JsHostModuleLoad.Now;
 
-        var resolution = Resolve(new JsModuleRequest(referrer, request.Specifier, null, JsModuleRequestKind.Dynamic), out var threw);
-
-        if (!resolution.IsResolved)
+        var cleanSpecifier = JsFormat.SplitTypedSpecifier(request.Specifier, out var type);
+        if (type.Length > 0)
         {
-            var failure = ResolveFailure(request.Specifier, referrer, resolution, threw);
+            var failure = new JsModuleException(
+                $"'{cleanSpecifier}' from {referrer} carries an import attribute: {JsModuleFailure.UnsupportedAttributes}.",
+                JsModulePhase.Resolve, cleanSpecifier, referrer);
             QueueRealmTask(() => FailImport(request, JsHostErrorKind.TypeError, failure.Message));
             return JsHostModuleLoad.Deferred;
         }
 
-        Start(new GraphLoad(resolution.Key.Value, request.Specifier, referrer, request));
+        var resolution = Resolve(new JsModuleRequest(referrer, cleanSpecifier, null, JsModuleRequestKind.Dynamic), out var threw);
+
+        if (!resolution.IsResolved)
+        {
+            var failure = ResolveFailure(cleanSpecifier, referrer, resolution, threw);
+            QueueRealmTask(() => FailImport(request, JsHostErrorKind.TypeError, failure.Message));
+            return JsHostModuleLoad.Deferred;
+        }
+
+        Start(new GraphLoad(resolution.Key.Value, cleanSpecifier, referrer, request));
         return JsHostModuleLoad.Deferred;
     }
 
@@ -418,7 +429,21 @@ internal sealed class VmModuleMap : IJsModuleMap
         var requests = JsCompiler.Requests(text, SliceParseOptions.Module);
         var diagnostic = requests.Succeeded ? null : requests.Diagnostics.FirstOrDefault();
 
-        if (diagnostic is null)
+        string? attributed = null;
+        var cleanSpecifiers = new List<string>(requests.Specifiers.Count);
+        if (requests.Succeeded)
+        {
+            foreach (var raw in requests.Specifiers)
+            {
+                var clean = JsFormat.SplitTypedSpecifier(raw, out var type);
+                if (attributed is null && (type.Length > 0 || raw.Contains('\0')))
+                    attributed = clean;
+
+                cleanSpecifiers.Add(clean);
+            }
+        }
+
+        if (diagnostic is null && attributed is null)
         {
             var alone = JsCompiler.Compile([], [new JsModuleUnit(key, text, SliceParseOptions.Module, [])], new JsCompileRequest());
 
@@ -426,16 +451,22 @@ internal sealed class VmModuleMap : IJsModuleMap
                 diagnostic = alone.Diagnostics.FirstOrDefault();
         }
 
-        var source = new ModuleSource(key, text, label, requests.Succeeded ? requests.Specifiers : []);
+        var source = new ModuleSource(key, text, label, cleanSpecifiers);
 
-        if (!requests.Succeeded || diagnostic is not null)
+        if (attributed is not null)
+        {
+            source.Failure = _ => new JsModuleException(
+                $"'{attributed}' in '{label}' carries an import attribute: {JsModuleFailure.UnsupportedAttributes}.",
+                JsModulePhase.Resolve, attributed, JsModuleReferrer.Module(new JsModuleKey(key)));
+        }
+        else if (!requests.Succeeded || diagnostic is not null)
         {
             if (diagnostic is { Code: SliceSourceDiagnosticCode.UnsupportedImportAttribute } &&
-                AttributedSpecifier(text, diagnostic, source.Specifiers) is { } attributed)
+                AttributedSpecifier(text, diagnostic, source.Specifiers) is { } diagAttributed)
             {
                 source.Failure = _ => new JsModuleException(
-                    $"'{attributed}' in '{label}' carries an import attribute: {JsModuleFailure.UnsupportedAttributes}. {diagnostic.Message}",
-                    JsModulePhase.Resolve, attributed, JsModuleReferrer.Module(new JsModuleKey(key)));
+                    $"'{diagAttributed}' in '{label}' carries an import attribute: {JsModuleFailure.UnsupportedAttributes}. {diagnostic.Message}",
+                    JsModulePhase.Resolve, diagAttributed, JsModuleReferrer.Module(new JsModuleKey(key)));
             }
             else
             {

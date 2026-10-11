@@ -112,7 +112,7 @@ public partial class JsealConformanceTests
     /// It cannot tell a fixed <c>importValue</c> from an unfixed one: no realm this repository builds
     /// can serve the child a module whose body calls <c>eval</c>. When importValue is implemented,
     /// this test has to be replaced by one that serves such a module and asserts the
-    /// <c>SyntaxError</c>. Broiler.VM has no ShadowRealm, so there it must still be absent.
+    /// <c>SyntaxError</c>. Broiler.VM rejects importValue with a TypeError.
     /// </para>
     /// </remarks>
     [Theory]
@@ -140,9 +140,12 @@ public partial class JsealConformanceTests
         restricted.DrainJobs();
 
         var outcome = restricted.ToJsString(restricted.GetProperty(restricted.Global, "imported"));
-        var expected = engine == "broiler-js"
-            ? "threw:TypeError:ShadowRealm.prototype.importValue is not implemented"
-            : "absent";
+        var expected = engine switch
+        {
+            "broiler-js" => "threw:TypeError:ShadowRealm.prototype.importValue is not implemented",
+            "broiler-vm" => "rejected:TypeError:'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them",
+            _ => "absent",
+        };
         Assert.Equal((engine, expected), (engine, outcome));
     }
 

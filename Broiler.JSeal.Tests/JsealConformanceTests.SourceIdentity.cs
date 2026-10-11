@@ -221,7 +221,8 @@ public partial class JsealConformanceTests
     /// </summary>
     /// <remarks>
     /// Broiler.JS renders guest frames as <c>label:line,column</c> in an error's <c>stack</c>; lines
-    /// survive forced strictness. Broiler.VM has no <c>stack</c> property and no script trace.
+    /// survive forced strictness. Broiler.VM renders <c>script:label:line:column</c> in an error's
+    /// <c>stack</c>, without populating ScriptStackTrace.
     /// </remarks>
     [Theory]
     [MemberData(nameof(Engines))]
@@ -239,7 +240,7 @@ public partial class JsealConformanceTests
 
             if (engine == "broiler-vm")
             {
-                Assert.True(stack.IsUndefined);
+                Assert.Contains("test:stack:3:", stack.AsString);
                 Assert.Null(failure.ScriptStackTrace);
                 continue;
             }

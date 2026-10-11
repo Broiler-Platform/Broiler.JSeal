@@ -217,8 +217,8 @@ SR-6), and SR-6 remains open upstream. That code is unreachable only while `eval
 and `importValue` is unimplemented. A test pins the pinned package's synchronous "not implemented"
 `TypeError` from `importValue`, so any package that changes it fails and forces SR-6 to be
 reviewed; the test cannot tell a fixed `importValue` from an unfixed one, and has to be replaced by
-one that loads an `eval`-calling module once `importValue` loads modules. Broiler.VM has no
-ShadowRealm.
+one that loads an `eval`-calling module once `importValue` loads modules. Broiler.VM rejects
+`importValue` with a `TypeError`.
 
 The policy belongs to the realm whose `eval`, `Function` or ShadowRealm is called, as ECMAScript's
 HostEnsureCanCompileStrings specifies. A restricted realm's own functions compile nothing even when
@@ -239,7 +239,7 @@ optional contract (see [Modules](#modules)), whose source labels come from the h
 | `SourceLabel` for guest throws and syntax errors leaving a source member | Yes | Yes |
 | `SourceLine` for a syntax error in the supplied text | Parser line when trusted; none at end of input, for an unterminated token, or for text with a lone CR, U+2028 or U+2029 | Front-end line; none for text with a backquote and a backslash-continued line |
 | `SourceColumn` | Not reported | Front-end UTF-16 column, with the line |
-| `ScriptStackTrace` and guest `error.stack` | Engine text with `label:line,column` frames | None |
+| `ScriptStackTrace` and guest `error.stack` | Engine text with `label:line,column` frames | Guest `error.stack` with `script:label:line:column` frames; `ScriptStackTrace` is None |
 
 Only the label is always present. A reported syntax-error line is the ECMAScript line in the
 supplied text; where a pinned engine is known to miscount, the provider reports no line rather than
