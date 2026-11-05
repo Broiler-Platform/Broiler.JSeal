@@ -1,4 +1,4 @@
-﻿using Broiler.JSeal.BroilerJs;
+using Broiler.JSeal.BroilerJs;
 
 namespace Broiler.JSeal.Tests;
 
@@ -183,9 +183,10 @@ public class JsealRegistryTests
         var replacement = new SubstituteProvider("ALPHA");
         registry.Register(permanent);
         using var start = new Barrier(2);
+        var cancellationToken = TestContext.Current.CancellationToken;
         var writer = Task.Run(() =>
         {
-            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10)));
+            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10), cancellationToken));
             for (var i = 0; i < 2_000; i++)
             {
                 registry.Register(transient);
@@ -194,10 +195,10 @@ public class JsealRegistryTests
                 Assert.True(registry.Unregister("alpha"));
                 Assert.Same(permanent, registry.GetDefault());
             }
-        });
+        }, cancellationToken);
         var reader = Task.Run(() =>
         {
-            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10)));
+            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10), cancellationToken));
             for (var i = 0; i < 4_000; i++)
             {
                 var selected = registry.GetDefault(i % 2 == 0 ? "alpha" : null);
@@ -206,8 +207,8 @@ public class JsealRegistryTests
                 Assert.Contains(permanent, registry.All);
                 Assert.Same(permanent, registry.Find("beta"));
             }
-        });
-        await Task.WhenAll(writer, reader).WaitAsync(TimeSpan.FromSeconds(20));
+        }, cancellationToken);
+        await Task.WhenAll(writer, reader).WaitAsync(TimeSpan.FromSeconds(20), cancellationToken);
         Assert.Same(permanent, registry.GetDefault());
     }
 

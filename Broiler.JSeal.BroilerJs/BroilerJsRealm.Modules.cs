@@ -64,9 +64,6 @@ internal partial class BroilerJsRealm
         ThrowIfDisposed();
         ThrowIfInModuleHost();
 
-        if (!BroilerJsModuleAnalysis.IsAvailable)
-            throw new NotSupportedException("This Broiler.JS build does not expose the module parse goal JSEAL's module adapter needs.");
-
         if (_moduleMapOpened)
             throw new InvalidOperationException("This realm already opened its module map; a realm has at most one.");
 
@@ -107,11 +104,9 @@ internal partial class BroilerJsRealm
         using var scope = Enter();
         try
         {
-            using (BroilerJsModuleAnalysis.EnterTopLevelAwait())
-            {
-                StringSpan code = text;
-                CoreScript.Compile(code, internalName, BroilerJsModuleContext.ModuleParameters, _context.CodeCache, null, isModule: true);
-            }
+            StringSpan code = text;
+            CoreScript.Compile(code, internalName, BroilerJsModuleContext.ModuleParameters, _context.CodeCache,
+                _context.CompilationOptions with { IsModule = true, AllowTopLevelAwait = true });
 
             return null;
         }

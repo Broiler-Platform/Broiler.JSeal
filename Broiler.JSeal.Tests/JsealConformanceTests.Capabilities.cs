@@ -393,7 +393,7 @@ public partial class JsealConformanceTests
 
         // Not None, which EnginesDeclaring would answer with every provider: a witness with no
         // capability-driven rows witnesses nothing, and the check that asked has to fail.
-        return data?.Parameters is [JsCapabilities required]
+        return data?.Arguments is [JsCapabilities required]
             ? required
             : throw new InvalidOperationException(
                 $"{capability}'s witness '{CapabilityWitnesses[capability]}' takes no rows from {nameof(EnginesDeclaring)}.");
@@ -462,7 +462,7 @@ public partial class JsealConformanceTests
             Assert.True(
                 data.Length == 1
                     && data[0].MemberName == nameof(EnginesDeclaring)
-                    && data[0].Parameters is [JsCapabilities required]
+                    && data[0].Arguments is [JsCapabilities required]
                     && required.HasFlag(capability),
                 $"{capability} names '{testName}', which must take its rows from " +
                 $"{nameof(EnginesDeclaring)}({capability}) so that it runs for exactly the providers declaring it.");
@@ -496,8 +496,8 @@ public partial class JsealConformanceTests
                 $"{nameof(AbsenceOnly)}, and not both.");
         }
 
-        Assert.Empty(CapabilityRefusals.Keys.Where(CoverageGaps.ContainsKey));
-        Assert.Empty(AbsenceOnly.Keys.Where(CoverageGaps.ContainsKey));
+        Assert.DoesNotContain(CapabilityRefusals.Keys, CoverageGaps.ContainsKey);
+        Assert.DoesNotContain(AbsenceOnly.Keys, CoverageGaps.ContainsKey);
     }
 
     /// <summary>

@@ -340,7 +340,7 @@ public partial class JsealConformanceTests
     {
         if (engine == NoEngineInThisBuild)
         {
-            Assert.Empty(JsEngineRegistry.All.Where(provider => BigIntSupport.GetValueOrDefault(provider.Name)));
+            Assert.DoesNotContain(JsEngineRegistry.All, provider => BigIntSupport.GetValueOrDefault(provider.Name));
             return;
         }
 
@@ -373,7 +373,7 @@ public partial class JsealConformanceTests
     {
         if (engine == NoEngineInThisBuild)
         {
-            Assert.Empty(JsEngineRegistry.All.Where(provider => !BigIntSupport.GetValueOrDefault(provider.Name, true)));
+            Assert.DoesNotContain(JsEngineRegistry.All, provider => !BigIntSupport.GetValueOrDefault(provider.Name, true));
             return;
         }
 

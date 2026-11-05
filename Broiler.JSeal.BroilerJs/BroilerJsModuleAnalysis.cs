@@ -35,25 +35,6 @@ namespace Broiler.JSeal.BroilerJs;
 /// </remarks>
 internal sealed class BroilerJsModuleAnalysis
 {
-    /// <summary>
-    /// The engine's parse-goal switches. Without both, a standalone parse of module text would use the
-    /// script goal and misread a top-level <c>await</c>. Looked up by reflection whatever their
-    /// visibility, and if either is missing the adapter refuses modules rather than guess.
-    /// </summary>
-    private static readonly MethodInfo? AllowTopLevelAwaitScope =
-        typeof(CoreScript).GetMethod("AllowTopLevelAwaitScope", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, Type.EmptyTypes);
-
-    private static readonly MethodInfo? ModuleGoalScope =
-        typeof(CoreScript).GetMethod("ModuleGoalScope", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, Type.EmptyTypes);
-
-    /// <summary>Whether this engine build exposes what module analysis needs.</summary>
-    internal static bool IsAvailable =>
-        AllowTopLevelAwaitScope?.ReturnType == typeof(IDisposable) && ModuleGoalScope?.ReturnType == typeof(IDisposable);
-
-    /// <summary>Enters the parse state the engine's own module compilation uses.</summary>
-    internal static IDisposable EnterTopLevelAwait() =>
-        (IDisposable)AllowTopLevelAwaitScope!.Invoke(null, null)!;
-
     private BroilerJsModuleAnalysis(List<StaticRequest> requests, string? refusal)
     {
         Requests = requests;
@@ -73,13 +54,7 @@ internal sealed class BroilerJsModuleAnalysis
     /// <remarks>The engine has already compiled the text by the time this runs, so a parse failure here is not expected.</remarks>
     internal static BroilerJsModuleAnalysis Analyze(string text)
     {
-        AstProgram program;
-        using (EnterTopLevelAwait())
-        using ((IDisposable)ModuleGoalScope!.Invoke(null, null)!)
-        {
-            StringSpan code = text;
-            program = new FastParser(new FastTokenStream(in code, null)).ParseProgram();
-        }
+        var program = FastParser.ParseModule(text);
 
         var requests = new List<StaticRequest>();
         var seen = new HashSet<string>(StringComparer.Ordinal);

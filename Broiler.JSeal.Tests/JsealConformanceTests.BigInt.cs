@@ -56,8 +56,8 @@ public partial class JsealConformanceTests
         if (engine != NoEngineInThisBuild)
             return false;
 
-        Assert.Empty(JsEngineRegistry.All.Where(provider =>
-            BigIntSurfaces.TryGetValue(provider.Name, out var surface) && selected(surface)));
+        Assert.DoesNotContain(JsEngineRegistry.All, provider =>
+            BigIntSurfaces.TryGetValue(provider.Name, out var surface) && selected(surface));
         return true;
     }
 
